@@ -71,6 +71,7 @@ import org.apache.cassandra.sidecar.routes.SchemaHandler;
 import org.apache.cassandra.sidecar.routes.SnapshotsHandler;
 import org.apache.cassandra.sidecar.routes.StreamSSTableComponentHandler;
 import org.apache.cassandra.sidecar.routes.TimeSkewHandler;
+import org.apache.cassandra.sidecar.routes.TokenRangeReplicaMapHandler;
 import org.apache.cassandra.sidecar.routes.cassandra.NodeSettingsHandler;
 import org.apache.cassandra.sidecar.routes.sstableuploads.SSTableCleanupHandler;
 import org.apache.cassandra.sidecar.routes.sstableuploads.SSTableImportHandler;
@@ -136,6 +137,7 @@ public class MainModule extends AbstractModule
                               SnapshotsHandler snapshotsHandler,
                               SchemaHandler schemaHandler,
                               RingHandler ringHandler,
+                              TokenRangeReplicaMapHandler tokenRangeHandler,
                               LoggerHandler loggerHandler,
                               GossipInfoHandler gossipInfoHandler,
                               TimeSkewHandler timeSkewHandler,
@@ -211,6 +213,9 @@ public class MainModule extends AbstractModule
 
         router.put(ApiEndpointsV1.SSTABLE_UPLOAD_ROUTE)
               .handler(ssTableUploadHandler);
+
+        router.get(ApiEndpointsV1.KEYSPACE_TOKEN_MAPPING_ROUTE)
+              .handler(tokenRangeHandler);
 
         router.put(ApiEndpointsV1.SSTABLE_IMPORT_ROUTE)
               .handler(ssTableImportHandler);
