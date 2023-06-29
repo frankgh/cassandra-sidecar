@@ -238,6 +238,7 @@ public class RequestContext
          * Sets the {@code request} to be a {@link TokenRangeReplicasRequest} and returns a reference to this Builder
          * enabling method chaining.
          *
+         * @param keyspace the keyspace in Cassandra
          * @return a reference to this Builder
          */
         public Builder tokenRangeReplicasRequest(String keyspace)
