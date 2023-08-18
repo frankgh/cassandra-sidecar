@@ -57,7 +57,7 @@ class SnapshotsHandlerIntegrationTest extends IntegrationTestBase
     void createSnapshotEndpointFailsWhenTableDoesNotExist(VertxTestContext context)
     throws InterruptedException
     {
-        createTestKeyspace(sidecarTestContext);
+        createTestKeyspace();
 
         WebClient client = WebClient.create(vertx);
         String testRoute = "/api/v1/keyspaces/testkeyspace/tables/non-existent/snapshots/my-snapshot";
@@ -72,7 +72,7 @@ class SnapshotsHandlerIntegrationTest extends IntegrationTestBase
     void createSnapshotFailsWhenSnapshotAlreadyExists(VertxTestContext context)
     throws InterruptedException
     {
-        createTestKeyspace(sidecarTestContext);
+        createTestKeyspace();
         String table = createTestTableAndPopulate(sidecarTestContext);
 
         WebClient client = WebClient.create(vertx);
@@ -98,7 +98,7 @@ class SnapshotsHandlerIntegrationTest extends IntegrationTestBase
     void testCreateSnapshotEndpoint(VertxTestContext context)
     throws InterruptedException
     {
-        createTestKeyspace(sidecarTestContext);
+        createTestKeyspace();
         String table = createTestTableAndPopulate(sidecarTestContext);
 
         WebClient client = WebClient.create(vertx);
@@ -136,7 +136,7 @@ class SnapshotsHandlerIntegrationTest extends IntegrationTestBase
     void deleteSnapshotFailsWhenTableDoesNotExist(VertxTestContext context)
     throws InterruptedException
     {
-        createTestKeyspace(sidecarTestContext);
+        createTestKeyspace();
         createTestTableAndPopulate(sidecarTestContext);
 
         String testRoute = "/api/v1/keyspaces/testkeyspace/tables/non-existent/snapshots/my-snapshot";
@@ -147,7 +147,7 @@ class SnapshotsHandlerIntegrationTest extends IntegrationTestBase
     void deleteSnapshotFailsWhenSnapshotDoesNotExist(VertxTestContext context)
     throws InterruptedException
     {
-        createTestKeyspace(sidecarTestContext);
+        createTestKeyspace();
         String table = createTestTableAndPopulate(sidecarTestContext);
 
         String testRoute = String.format("/api/v1/keyspaces/%s/tables/%s/snapshots/non-existent",
@@ -160,7 +160,7 @@ class SnapshotsHandlerIntegrationTest extends IntegrationTestBase
     void testDeleteSnapshotEndpoint(VertxTestContext context)
     throws InterruptedException
     {
-        createTestKeyspace(sidecarTestContext);
+        createTestKeyspace();
         String table = createTestTableAndPopulate(sidecarTestContext);
 
         WebClient client = WebClient.create(vertx);
@@ -203,9 +203,9 @@ class SnapshotsHandlerIntegrationTest extends IntegrationTestBase
 
     private String createTestTableAndPopulate(CassandraSidecarTestContext cassandraTestContext)
     {
-        QualifiedTableName tableName = createTestTable(cassandraTestContext,
-                                                       "CREATE TABLE %s (id text PRIMARY KEY, name text);");
-        Session session = maybeGetSession(cassandraTestContext);
+        QualifiedTableName tableName = createTestTable(
+        "CREATE TABLE %s (id text PRIMARY KEY, name text);");
+        Session session = maybeGetSession();
 
         session.execute("INSERT INTO " + tableName + " (id, name) VALUES ('1', 'Francisco');");
         session.execute("INSERT INTO " + tableName + " (id, name) VALUES ('2', 'Saranya');");
