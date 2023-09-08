@@ -56,7 +56,7 @@ public class TokenRangeReplicaProvider
     {
     }
 
-    private final JmxClient jmxClient;
+    protected final JmxClient jmxClient;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenRangeReplicaProvider.class);
 
