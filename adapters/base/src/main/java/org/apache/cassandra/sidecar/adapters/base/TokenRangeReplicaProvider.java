@@ -73,6 +73,7 @@ public class TokenRangeReplicaProvider
 
         List<TokenRangeReplicas> naturalTokenRangeReplicas =
             getTokenRangeReplicas("Natural", keyspace, partitioner, storage::getRangeToEndpointWithPortMap);
+        // Pending ranges include bootstrap tokens and leaving endpoints as represented in the Cassandra TokenMetadata
         List<TokenRangeReplicas> pendingTokenRangeReplicas =
             getTokenRangeReplicas("Pending", keyspace, partitioner, storage::getPendingRangeToEndpointWithPortMap);
 
@@ -96,7 +97,6 @@ public class TokenRangeReplicaProvider
     private List<TokenRangeReplicas> getTokenRangeReplicas(String rangeType, String keyspace, Partitioner partitioner,
                                                            KeyspaceToRangeMappingFunc rangeMappingSupplier)
     {
-        // Pending ranges include bootstrap tokens and leaving endpoints as represented in the Cassandra TokenMetadata
         Map<List<String>, List<String>> rangeMappings = rangeMappingSupplier.apply(keyspace);
         LOGGER.debug(rangeType + " token range mappings for keyspace={}, rangeMappings={}", keyspace, rangeMappings);
         return transformRangeMappings(rangeMappings, partitioner);
