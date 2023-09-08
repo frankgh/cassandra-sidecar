@@ -67,7 +67,7 @@ public class IntegrationTestModule extends AbstractModule
         public List<InstanceMetadata> instances()
         {
             if (cassandraTestContext.isClusterBuilt())
-                return cassandraTestContext.instancesConfig.instances();
+                return cassandraTestContext.instancesConfig().instances();
             return Collections.emptyList();
         }
 
@@ -80,7 +80,7 @@ public class IntegrationTestModule extends AbstractModule
          */
         public InstanceMetadata instanceFromId(int id) throws NoSuchElementException
         {
-            return cassandraTestContext.instancesConfig.instanceFromId(id);
+            return cassandraTestContext.instancesConfig().instanceFromId(id);
         }
 
         /**
@@ -92,7 +92,7 @@ public class IntegrationTestModule extends AbstractModule
          */
         public InstanceMetadata instanceFromHost(String host) throws NoSuchElementException
         {
-            return cassandraTestContext.instancesConfig.instanceFromHost(host);
+            return cassandraTestContext.instancesConfig().instanceFromHost(host);
         }
     }
 
