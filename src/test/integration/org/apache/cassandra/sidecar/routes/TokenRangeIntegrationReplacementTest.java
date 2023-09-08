@@ -39,7 +39,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Uninterruptibles;
-
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -67,8 +66,6 @@ import org.apache.cassandra.utils.Shared;
 
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
-import static org.apache.cassandra.sidecar.routes.TokenRangeIntegrationReplacementTest
-              .BBHelperReplacementsMultiDC.NODE_START;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -81,6 +78,7 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
     void retrieveMappingWithNodeReplacement(VertxTestContext context,
                                             ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
+        BBHelperReplacementsNode.reset();
         runReplacementTestScenario(context,
                                    cassandraTestContext,
                                    BBHelperReplacementsNode::install,
@@ -95,7 +93,7 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
                                                    ConfigurableCassandraTestContext cassandraTestContext)
     throws Exception
     {
-
+        BBHelperReplacementsMultiDC.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperReplacementsMultiDC::install, cassandraTestContext);
 
         List<IUpgradeableInstance> nodesToRemove = Arrays.asList(cluster.get(3), cluster.get(cluster.size()));
@@ -126,7 +124,7 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
             builder.withTokenSupplier(tokenSupplier);
         });
 
-        List<IUpgradeableInstance> nodesToRemove = Arrays.asList(cluster.get(cluster.size()));
+        List<IUpgradeableInstance> nodesToRemove = Collections.singletonList(cluster.get(cluster.size()));
         runReplacementTestScenario(context,
                                    cassandraTestContext,
                                    transientStateStart,
@@ -192,7 +190,7 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
                                                                                              .stream()
                                                                                              .filter(
                                                                                              i -> i.getAddress()
-                                                                                                .equals(newAddress))
+                                                                                                   .equals(newAddress))
                                                                                              .findFirst();
                 assertThat(replacementInstance).isPresent();
                 // Verify that replacement node tokens match the removed nodes
@@ -211,7 +209,7 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
                                    dcReplication,
                                    nodeNumber -> nodeNums.contains(nodeNumber) ? "Joining" : "Normal");
 
-                int nodeCount = annotation.nodesPerDc()  * annotation.numDcs();
+                int nodeCount = annotation.nodesPerDc() * annotation.numDcs();
                 validateTokenRanges(mappingResponse, generateExpectedRanges(nodeCount));
 
                 validateReplicaMapping(mappingResponse, newNodes, expectedRangeMappings);
@@ -221,7 +219,7 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
         finally
         {
             for (int i = 0;
-               i < (cassandraTestContext.annotation.newNodesPerDc() * cassandraTestContext.annotation.numDcs()); i++)
+                 i < (cassandraTestContext.annotation.newNodesPerDc() * cassandraTestContext.annotation.numDcs()); i++)
             {
                 transientStateEnd.countDown();
             }
@@ -252,13 +250,13 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
                 properties.set(CassandraRelevantProperties.BOOTSTRAP_SCHEMA_DELAY_MS,
                                TimeUnit.SECONDS.toMillis(10L));
                 properties.with("cassandra.broadcast_interval_ms",
-                                   Long.toString(TimeUnit.SECONDS.toMillis(30L)));
+                                Long.toString(TimeUnit.SECONDS.toMillis(30L)));
                 properties.with("cassandra.ring_delay_ms",
-                                   Long.toString(TimeUnit.SECONDS.toMillis(10L)));
+                                Long.toString(TimeUnit.SECONDS.toMillis(10L)));
                 properties.with("cassandra.replace_address_first_boot", remAddress + ":" + remPort);
             })).start();
 
-            Uninterruptibles.awaitUninterruptibly(NODE_START, 2, TimeUnit.MINUTES);
+            Uninterruptibles.awaitUninterruptibly(BBHelperReplacementsMultiDC.NODE_START, 2, TimeUnit.MINUTES);
             newNodes.add(replacement);
         }
         return newNodes;
@@ -301,16 +299,16 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
     /**
      * Generates expected token range and replica mappings specific to the test case involving a 5 node cluster
      * with the last node replaced with a new node
-     *
+     * <p>
      * Expected ranges are generated by adding RF replicas per range in increasing order. The replica-sets in
      * subsequent ranges cascade with the next range excluding the first replica, and including the next replica from
      * the nodes.
      * eg.
      * Range 1 - A, B, C
      * Range 2 - B, C, D
-     *
+     * <p>
      * Ranges will have [RF] replicas with ranges containing the replacement node having [RF + no. replacement nodes].
-     *
+     * <p>
      * eg.
      * Range 1 - A, B, C
      * Range 2 - B, C, D (with D being replaced with E)
@@ -319,7 +317,7 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
     private Map<String, Map<Range<BigInteger>, List<String>>> generateExpectedRangeMappingNodeReplacement()
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
-        int nodeCount = annotation.nodesPerDc()  * annotation.numDcs();
+        int nodeCount = annotation.nodesPerDc() * annotation.numDcs();
         List<Range<BigInteger>> expectedRanges = generateExpectedRanges(nodeCount);
         Map<Range<BigInteger>, List<String>> mapping = new HashMap<>();
         mapping.put(expectedRanges.get(0), Arrays.asList("127.0.0.1", "127.0.0.2", "127.0.0.3"));
@@ -342,20 +340,20 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
     /**
      * Generates expected token range and replica mappings specific to the test case involving a 10 node cluster
      * across 2 DCs with the last 2 nodes leaving the cluster (1 per DC), with RF 3
-     *
+     * <p>
      * Expected ranges are generated by adding RF replicas per range in increasing order. The replica-sets in
      * subsequent ranges cascade with the next range excluding the first replica, and including the next replica from
      * the nodes.
      * eg.
      * Range 1 - A, B, C
      * Range 2 - B, C, D
-     *
+     * <p>
      * In a multi-DC scenario, a single range will have nodes from both DCs. The replicas are grouped by DC here
      * to allow per-DC validation as returned from the sidecar endpoint.
-     *
+     * <p>
      * Ranges that including leaving node replicas will have [RF + no. leaving nodes in replica-set] replicas with
      * the new replicas being the existing nodes in ring-order.
-     *
+     * <p>
      * eg.
      * Range 1 - A, B, C
      * Range 2 - B, C, D (with D being the leaving node)
@@ -432,8 +430,8 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
     @Shared
     public static class BBHelperReplacementsNode
     {
-        public static final CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(1);
-        public static final CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(1);
+        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(1);
+        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -463,6 +461,12 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
             Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
             return result;
         }
+
+        public static void reset()
+        {
+            TRANSIENT_STATE_START = new CountDownLatch(1);
+            TRANSIENT_STATE_END = new CountDownLatch(1);
+        }
     }
 
     /**
@@ -473,9 +477,9 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
     {
         // Additional latch used here to sequentially start the 2 new nodes to isolate the loading
         // of the shared Cassandra system property REPLACE_ADDRESS_FIRST_BOOT across instances
-        public static final CountDownLatch NODE_START = new CountDownLatch(1);
-        public static final CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(2);
-        public static final CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(2);
+        public static CountDownLatch NODE_START = new CountDownLatch(1);
+        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(2);
+        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(2);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -505,6 +509,13 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
             TRANSIENT_STATE_START.countDown();
             Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
             return result;
+        }
+
+        public static void reset()
+        {
+            NODE_START = new CountDownLatch(1);
+            TRANSIENT_STATE_START = new CountDownLatch(2);
+            TRANSIENT_STATE_END = new CountDownLatch(2);
         }
     }
 }

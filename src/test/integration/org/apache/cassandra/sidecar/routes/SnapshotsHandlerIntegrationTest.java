@@ -114,9 +114,9 @@ class SnapshotsHandlerIntegrationTest extends IntegrationTestBase
                                                          "my-snapshot");
                   assertThat(found).isNotEmpty();
 
-                  assertThat(found.stream().anyMatch(p -> p.endsWith("manifest.json")));
-                  assertThat(found.stream().anyMatch(p -> p.endsWith("schema.cql")));
-                  assertThat(found.stream().anyMatch(p -> p.endsWith("-big-Data.db")));
+                  assertThat(found.stream().anyMatch(p -> p.endsWith("manifest.json"))).isTrue();
+                  assertThat(found.stream().anyMatch(p -> p.endsWith("schema.cql"))).isTrue();
+                  assertThat(found.stream().anyMatch(p -> p.endsWith("-big-Data.db"))).isTrue();
 
 
                   context.completeNow();
