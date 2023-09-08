@@ -56,6 +56,7 @@ import net.bytebuddy.pool.TypePool;
 import org.apache.cassandra.config.CassandraRelevantProperties;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.api.Feature;
+import org.apache.cassandra.distributed.api.IInstanceConfig;
 import org.apache.cassandra.distributed.api.IUpgradeableInstance;
 import org.apache.cassandra.distributed.api.TokenSupplier;
 import org.apache.cassandra.distributed.shared.ClusterUtils;
@@ -235,9 +236,10 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
         for (IUpgradeableInstance removed : nodesToRemove)
         {
             // Add new instance for each removed instance as a replacement of its owned token
-            String remAddress = removed.config().broadcastAddress().getAddress().getHostAddress();
-            int remPort = removed.config().getInt("storage_port");
-            IUpgradeableInstance replacement = ClusterUtils.addInstance(cluster, removed.config(),
+            IInstanceConfig removedConfig = removed.config();
+            String remAddress = removedConfig.broadcastAddress().getAddress().getHostAddress();
+            int remPort = removedConfig.getInt("storage_port");
+            IUpgradeableInstance replacement = ClusterUtils.addInstance(cluster, removedConfig,
                                                                         c -> {
                                                                             c.set("auto_bootstrap", true);
                                                                             c.with(Feature.GOSSIP,
@@ -249,11 +251,11 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
                 properties.set(CassandraRelevantProperties.BOOTSTRAP_SKIP_SCHEMA_CHECK, true);
                 properties.set(CassandraRelevantProperties.BOOTSTRAP_SCHEMA_DELAY_MS,
                                TimeUnit.SECONDS.toMillis(10L));
-                System.setProperty("cassandra.broadcast_interval_ms",
+                properties.with("cassandra.broadcast_interval_ms",
                                    Long.toString(TimeUnit.SECONDS.toMillis(30L)));
-                System.setProperty("cassandra.ring_delay_ms",
+                properties.with("cassandra.ring_delay_ms",
                                    Long.toString(TimeUnit.SECONDS.toMillis(10L)));
-                System.setProperty("cassandra.replace_address_first_boot", remAddress + ":" + remPort);
+                properties.with("cassandra.replace_address_first_boot", remAddress + ":" + remPort);
             })).start();
 
             Uninterruptibles.awaitUninterruptibly(NODE_START, 2, TimeUnit.MINUTES);
