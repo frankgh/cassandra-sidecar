@@ -212,7 +212,9 @@ public class CassandraSidecarTestContext implements AutoCloseable
                                                                            nativeTransportPort);
             CQLSessionProvider sessionProvider = new CQLSessionProvider(address, new NettyOptions());
             this.sessionProviders.add(sessionProvider);
-            JmxClient jmxClient = new JmxClient(hostName, config.jmxPort());
+            // The in-jvm dtest framework sometimes returns a cluster before all the jmx infrastructure is initialized.
+            // In these cases, we want to wait longer than the default retry/delay settings to connect.
+            JmxClient jmxClient = new JmxClient(hostName, config.jmxPort(), null, null, false, 20, 1000L);
             this.jmxClients.add(jmxClient);
 
             String[] dataDirectories = (String[]) config.get("data_file_directories");

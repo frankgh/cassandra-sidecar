@@ -32,8 +32,8 @@ cassandra_instances:
     jmx_host: 127.0.0.1
     jmx_port: 7100
     jmx_ssl_enabled: false
-#    jmx_role:
-#    jmx_role_password:
+  #    jmx_role:
+  #    jmx_role_password:
   - id: 2
     host: localhost2
     port: 9042
@@ -46,8 +46,8 @@ cassandra_instances:
     jmx_host: 127.0.0.1
     jmx_port: 7200
     jmx_ssl_enabled: false
-#    jmx_role:
-#    jmx_role_password:
+  #    jmx_role:
+  #    jmx_role_password:
   - id: 3
     host: localhost3
     port: 9042
@@ -91,9 +91,6 @@ sidecar:
       name: "sidecar-internal-worker-pool"
       size: 20
       max_execution_time_millis: 900000 # 15 minutes
-  jmx:
-    max_retries: 3
-    retry_delay_millis: 200
 #
 # Enable SSL configuration (Disabled by default)
 #

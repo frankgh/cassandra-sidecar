@@ -57,6 +57,7 @@ import org.apache.cassandra.sidecar.common.dns.DnsResolver;
 import org.apache.cassandra.sidecar.common.utils.SidecarVersionProvider;
 import org.apache.cassandra.sidecar.config.CassandraInputValidationConfiguration;
 import org.apache.cassandra.sidecar.config.InstanceConfiguration;
+import org.apache.cassandra.sidecar.config.JmxConfiguration;
 import org.apache.cassandra.sidecar.config.ServiceConfiguration;
 import org.apache.cassandra.sidecar.config.SidecarConfiguration;
 import org.apache.cassandra.sidecar.config.SslConfiguration;
@@ -269,10 +270,14 @@ public class MainModule extends AbstractModule
         List<InstanceMetadata> instanceMetadataList =
         configuration.cassandraInstances()
                      .stream()
-                     .map(cassandraInstance -> buildInstanceMetadata(cassandraInstance,
-                                                                     cassandraVersionProvider,
-                                                                     healthCheckFrequencyMillis,
-                                                                     sidecarVersionProvider.sidecarVersion()))
+                     .map(cassandraInstance -> {
+                         JmxConfiguration jmxConfiguration = configuration.serviceConfiguration().jmxConfiguration();
+                         return buildInstanceMetadata(cassandraInstance,
+                                                      cassandraVersionProvider,
+                                                      healthCheckFrequencyMillis,
+                                                      sidecarVersionProvider.sidecarVersion(),
+                                                      jmxConfiguration);
+                     })
                      .collect(Collectors.toList());
 
         return new InstancesConfigImpl(instanceMetadataList, dnsResolver);
@@ -353,12 +358,14 @@ public class MainModule extends AbstractModule
      * @param versionProvider            a Cassandra version provider
      * @param healthCheckFrequencyMillis the health check frequency configuration in milliseconds
      * @param sidecarVersion             the version of the Sidecar from the current binary
+     * @param jmxConfiguration
      * @return the build instance metadata object
      */
     private static InstanceMetadata buildInstanceMetadata(InstanceConfiguration cassandraInstance,
                                                           CassandraVersionProvider versionProvider,
                                                           int healthCheckFrequencyMillis,
-                                                          String sidecarVersion)
+                                                          String sidecarVersion,
+                                                          JmxConfiguration jmxConfiguration)
     {
         String host = cassandraInstance.host();
         int port = cassandraInstance.port();
@@ -368,7 +375,9 @@ public class MainModule extends AbstractModule
                                             cassandraInstance.jmxPort(),
                                             cassandraInstance.jmxRole(),
                                             cassandraInstance.jmxRolePassword(),
-                                            cassandraInstance.jmxSslEnabled());
+                                            cassandraInstance.jmxSslEnabled(),
+                                            jmxConfiguration.maxRetries(),
+                                            jmxConfiguration.retryDelayMillis());
         CassandraAdapterDelegate delegate = new CassandraAdapterDelegate(versionProvider,
                                                                          session,
                                                                          jmxClient,
