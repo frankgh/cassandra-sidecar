@@ -30,8 +30,8 @@ import io.vertx.ext.web.RoutingContext;
 import org.apache.cassandra.sidecar.common.CassandraAdapterDelegate;
 import org.apache.cassandra.sidecar.common.StorageOperations;
 import org.apache.cassandra.sidecar.common.data.TokenRangeReplicasRequest;
-import org.apache.cassandra.sidecar.common.utils.CassandraInputValidator;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
+import org.apache.cassandra.sidecar.utils.CassandraInputValidator;
 import org.apache.cassandra.sidecar.utils.HttpExceptions;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
 
@@ -70,17 +70,18 @@ public class TokenRangeReplicaMapHandler extends AbstractHandler<TokenRangeRepli
     {
         CassandraAdapterDelegate delegate = metadataFetcher.delegate(host);
 
-        StorageOperations storageOperations = delegate.storageOperations();
+        StorageOperations operations = delegate.storageOperations();
         Metadata metadata = delegate.metadata();
-        if (storageOperations == null || metadata == null)
+        if (operations == null || metadata == null)
         {
             context.fail(cassandraServiceUnavailable());
             return;
         }
 
-        executorPools.service().executeBlocking(promise ->
-            context.json(storageOperations.tokenRangeReplicas(request.keyspace(), metadata.getPartitioner()))
-        ).onFailure(cause -> processFailure(cause, context, host, remoteAddress, request));
+        executorPools.service()
+                     .executeBlocking(promise -> context.json(operations.tokenRangeReplicas(request.keyspace(),
+                                                                                            metadata.getPartitioner()))
+                     ).onFailure(cause -> processFailure(cause, context, host, remoteAddress, request));
     }
 
     @Override
