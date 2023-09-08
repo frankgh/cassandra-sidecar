@@ -145,7 +145,7 @@ jobs:
     steps:
       - checkout
       - run: BRANCHES="cassandra-5.0" scripts/build-dtest-jars.sh
-      - run: ./gradlew -PdtestVersion=5.0-alpha1 -Dcassandra.sidecar.versions_to_test="5.0" --info checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
+      - run: ./gradlew -PdtestVersion=5.0-alpha2 -Dcassandra.sidecar.versions_to_test="5.0" --info checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
 
       - store_artifacts:
           path: build/reports
