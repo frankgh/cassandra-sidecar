@@ -78,6 +78,8 @@ jobs:
   integration_cassandra_40_java8:
     docker:
      - image: circleci/openjdk:8-jdk-stretch
+    environment:
+      INTEGRATION_MAX_PARALLEL_FORKS: 1
     resource_class: xlarge
     steps:
      - checkout
@@ -95,6 +97,8 @@ jobs:
   integration_cassandra_41_java8:
     docker:
      - image: circleci/openjdk:8-jdk-stretch
+    environment:
+      INTEGRATION_MAX_PARALLEL_FORKS: 1
     resource_class: xlarge
     steps:
      - checkout
@@ -128,6 +132,8 @@ jobs:
   integration_cassandra_40_java11:
     docker:
       - image: circleci/openjdk:11-jdk-stretch
+    environment:
+      INTEGRATION_MAX_PARALLEL_FORKS: 1
     resource_class: xlarge
     steps:
       - checkout
@@ -145,7 +151,9 @@ jobs:
   integration_cassandra_50_java11:
     docker:
       - image: circleci/openjdk:11-jdk-stretch
-    resource_class: xlarge
+    environment:
+      INTEGRATION_MAX_PARALLEL_FORKS: 2
+    resource_class: 2xlarge
     steps:
       - checkout
       - run: BRANCHES="cassandra-5.0" scripts/build-dtest-jars.sh
@@ -161,7 +169,9 @@ jobs:
   integration_cassandra_trunk_java11:
     docker:
       - image: circleci/openjdk:11-jdk-stretch
-    resource_class: xlarge
+    environment:
+      INTEGRATION_MAX_PARALLEL_FORKS: 2
+    resource_class: 2xlarge
     steps:
       - checkout
       - run: BRANCHES="trunk" scripts/build-dtest-jars.sh
