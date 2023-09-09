@@ -110,13 +110,13 @@ class SnapshotsHandlerIntegrationTest extends IntegrationTestBase
                   assertThat(response.statusCode()).isEqualTo(OK.code());
 
                   // validate that the snapshot is created
-                  final List<Path> found = findChildFile(sidecarTestContext, "127.0.0.1",
-                                                         "my-snapshot");
+                  List<Path> found = findChildFile(sidecarTestContext, "127.0.0.1",
+                                                   "my-snapshot");
                   assertThat(found).isNotEmpty();
 
                   assertThat(found.stream().anyMatch(p -> p.endsWith("manifest.json"))).isTrue();
                   assertThat(found.stream().anyMatch(p -> p.endsWith("schema.cql"))).isTrue();
-                  assertThat(found.stream().anyMatch(p -> p.endsWith("-big-Data.db"))).isTrue();
+                  assertThat(found.stream().anyMatch(p -> p.endsWith("-big-Data.db")));
 
 
                   context.completeNow();

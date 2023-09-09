@@ -83,7 +83,7 @@ jobs:
      - checkout
      # Cassandra 4.0 jar seems to be missing some dependencies, so we use 4.1 here (this is what we currently do)
      - run: BRANCHES="cassandra-4.0 cassandra-4.1" scripts/build-dtest-jars.sh
-     - run: ./gradlew -PdtestVersion=4.1.4 -Dcassandra.sidecar.versions_to_test="4.0" checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
+     - run: ./gradlew -PdtestVersion=4.1.4 -Dcassandra.sidecar.versions_to_test="4.0" :integrationTest:check --stacktrace
 
      - store_artifacts:
          path: build/reports
@@ -99,7 +99,7 @@ jobs:
     steps:
      - checkout
      - run: BRANCHES="cassandra-4.1" scripts/build-dtest-jars.sh
-     - run: ./gradlew -PdtestVersion=4.1.4 -Dcassandra.sidecar.versions_to_test="4.1" checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
+     - run: ./gradlew -PdtestVersion=4.1.4 -Dcassandra.sidecar.versions_to_test="4.1" :integrationTest:check --stacktrace
 
      - store_artifacts:
          path: build/reports
@@ -133,7 +133,7 @@ jobs:
       - checkout
       # Cassandra 4.0 jar seems to be missing some dependencies, so we use 4.1 here (this is what we currently do)
       - run: BRANCHES="cassandra-4.0 cassandra-4.1" CASSANDRA_USE_JDK11=true scripts/build-dtest-jars.sh
-      - run: ./gradlew -PdtestVersion=4.1.4 -Dcassandra.sidecar.versions_to_test="4.0" checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
+      - run: ./gradlew -PdtestVersion=4.1.4 -Dcassandra.sidecar.versions_to_test="4.0" :integrationTest:check --stacktrace
 
       - store_artifacts:
           path: build/reports
@@ -149,7 +149,7 @@ jobs:
     steps:
       - checkout
       - run: BRANCHES="cassandra-5.0" scripts/build-dtest-jars.sh
-      - run: ./gradlew -PdtestVersion=5.0-alpha2 -Dcassandra.sidecar.versions_to_test="5.0" checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
+      - run: ./gradlew -PdtestVersion=5.0-alpha2 -Dcassandra.sidecar.versions_to_test="5.0" :integrationTest:check --stacktrace
 
       - store_artifacts:
           path: build/reports
@@ -165,7 +165,7 @@ jobs:
     steps:
       - checkout
       - run: BRANCHES="trunk" scripts/build-dtest-jars.sh
-      - run: ./gradlew -PdtestVersion=5.1 -Dcassandra.sidecar.versions_to_test="5.1" checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
+      - run: ./gradlew -PdtestVersion=5.1 -Dcassandra.sidecar.versions_to_test="5.1" :integrationTest:check --stacktrace
 
       - store_artifacts:
           path: build/reports
