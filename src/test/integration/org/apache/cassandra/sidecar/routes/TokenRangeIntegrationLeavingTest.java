@@ -599,8 +599,8 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
     @Shared
     public static class BBHelperSingleLeavingNode
     {
-        public static CountDownLatch transientStateStart = new CountDownLatch(1);
-        public static CountDownLatch transientStateEnd = new CountDownLatch(1);
+        static CountDownLatch transientStateStart = new CountDownLatch(1);
+        static CountDownLatch transientStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -641,8 +641,8 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
     @Shared
     public static class BBHelperMultipleLeavingNodes
     {
-        public static CountDownLatch transientStateStart = new CountDownLatch(2);
-        public static CountDownLatch transientStateEnd = new CountDownLatch(2);
+        static CountDownLatch transientStateStart = new CountDownLatch(2);
+        static CountDownLatch transientStateEnd = new CountDownLatch(2);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -683,8 +683,8 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
     @Shared
     public static class BBHelperHalveClusterSize
     {
-        public static CountDownLatch transientStateStart = new CountDownLatch(3);
-        public static CountDownLatch transientStateEnd = new CountDownLatch(3);
+        static CountDownLatch transientStateStart = new CountDownLatch(3);
+        static CountDownLatch transientStateEnd = new CountDownLatch(3);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -725,8 +725,8 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
     @Shared
     public static class BBHelperLeavingNodesMultiDC
     {
-        public static CountDownLatch transientStateStart = new CountDownLatch(2);
-        public static CountDownLatch transientStateEnd = new CountDownLatch(2);
+        static CountDownLatch transientStateStart = new CountDownLatch(2);
+        static CountDownLatch transientStateEnd = new CountDownLatch(2);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -767,8 +767,8 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
     @Shared
     public static class BBHelperHalveClusterMultiDC
     {
-        public static CountDownLatch transientStateStart = new CountDownLatch(6);
-        public static CountDownLatch transientStateEnd = new CountDownLatch(6);
+        static CountDownLatch transientStateStart = new CountDownLatch(6);
+        static CountDownLatch transientStateEnd = new CountDownLatch(6);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {

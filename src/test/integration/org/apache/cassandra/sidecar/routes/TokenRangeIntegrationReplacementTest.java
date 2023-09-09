@@ -429,8 +429,8 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
     @Shared
     public static class BBHelperReplacementsNode
     {
-        public static CountDownLatch transientStateStart = new CountDownLatch(1);
-        public static CountDownLatch transientStateEnd = new CountDownLatch(1);
+        static CountDownLatch transientStateStart = new CountDownLatch(1);
+        static CountDownLatch transientStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -476,9 +476,9 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
     {
         // Additional latch used here to sequentially start the 2 new nodes to isolate the loading
         // of the shared Cassandra system property REPLACE_ADDRESS_FIRST_BOOT across instances
-        public static CountDownLatch nodeStart = new CountDownLatch(1);
-        public static CountDownLatch transientStateStart = new CountDownLatch(2);
-        public static CountDownLatch transientStateEnd = new CountDownLatch(2);
+        static CountDownLatch nodeStart = new CountDownLatch(1);
+        static CountDownLatch transientStateStart = new CountDownLatch(2);
+        static CountDownLatch transientStateEnd = new CountDownLatch(2);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {

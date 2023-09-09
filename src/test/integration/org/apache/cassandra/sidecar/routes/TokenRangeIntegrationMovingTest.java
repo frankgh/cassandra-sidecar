@@ -413,8 +413,8 @@ public class TokenRangeIntegrationMovingTest extends BaseTokenRangeIntegrationTe
     @Shared
     public static class BBHelperMovingNodeMultiDC
     {
-        public static CountDownLatch transientStateStart = new CountDownLatch(1);
-        public static CountDownLatch transientStateEnd = new CountDownLatch(1);
+        static CountDownLatch transientStateStart = new CountDownLatch(1);
+        static CountDownLatch transientStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -455,8 +455,8 @@ public class TokenRangeIntegrationMovingTest extends BaseTokenRangeIntegrationTe
     @Shared
     public static class BBHelperMovingNode
     {
-        public static CountDownLatch transientStateStart = new CountDownLatch(1);
-        public static CountDownLatch transientStateEnd = new CountDownLatch(1);
+        static CountDownLatch transientStateStart = new CountDownLatch(1);
+        static CountDownLatch transientStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
