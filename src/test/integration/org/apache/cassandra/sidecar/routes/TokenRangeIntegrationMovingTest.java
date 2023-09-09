@@ -99,20 +99,6 @@ public class TokenRangeIntegrationMovingTest extends BaseTokenRangeIntegrationTe
                               moveTarget);
     }
 
-    private long getMoveTargetToken(UpgradeableCluster cluster)
-    {
-        CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
-        IUpgradeableInstance seed = cluster.get(1);
-        // The target token to move the node to is calculated by adding an offset to the seed node token which
-        // is half of the range between 2 tokens.
-        // For multi-DC case (specifically 2 DCs), since neighbouring tokens can be consecutive, we use tokens 1
-        // and 3 to calculate the offset
-        int nextIndex = (annotation.numDcs() > 1) ? 3 : 2;
-        long t2 = Long.parseLong(seed.config().getString("initial_token"));
-        long t3 = Long.parseLong(cluster.get(nextIndex).config().getString("initial_token"));
-        return (t2 + ((t3 - t2) / 2));
-    }
-
     @CassandraIntegrationTest(nodesPerDc = 5, numDcs = 2, network = true, gossip = true, buildCluster = false)
     void retrieveMappingWhileMovingNodeMultiDC(VertxTestContext context,
                                                ConfigurableCassandraTestContext cassandraTestContext) throws Exception
@@ -152,7 +138,7 @@ public class TokenRangeIntegrationMovingTest extends BaseTokenRangeIntegrationTe
             }
 
             IUpgradeableInstance seed = cluster.get(1);
-            final int movingNodeIndex = (annotation.numDcs() > 1) ? MULTIDC_MOVING_NODE_IDX : MOVING_NODE_IDX;
+            int movingNodeIndex = (annotation.numDcs() > 1) ? MULTIDC_MOVING_NODE_IDX : MOVING_NODE_IDX;
 
             IUpgradeableInstance movingNode = cluster.get(movingNodeIndex);
             new Thread(() -> movingNode.nodetoolResult("move", "--", Long.toString(moveTargetToken))
@@ -407,6 +393,20 @@ public class TokenRangeIntegrationMovingTest extends BaseTokenRangeIntegrationTe
         return multiDCMapping;
     }
 
+    private long getMoveTargetToken(UpgradeableCluster cluster)
+    {
+        CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
+        IUpgradeableInstance seed = cluster.get(1);
+        // The target token to move the node to is calculated by adding an offset to the seed node token which
+        // is half of the range between 2 tokens.
+        // For multi-DC case (specifically 2 DCs), since neighbouring tokens can be consecutive, we use tokens 1
+        // and 3 to calculate the offset
+        int nextIndex = (annotation.numDcs() > 1) ? 3 : 2;
+        long t2 = Long.parseLong(seed.config().getString("initial_token"));
+        long t3 = Long.parseLong(cluster.get(nextIndex).config().getString("initial_token"));
+        return (t2 + ((t3 - t2) / 2));
+    }
+
     /**
      * ByteBuddy Helper for a multiDC moving node
      */
@@ -426,7 +426,7 @@ public class TokenRangeIntegrationMovingTest extends BaseTokenRangeIntegrationTe
                                                       .resolve();
                 new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
                                .method(named("stream"))
-                               .intercept(MethodDelegation.to(BBHelperMovingNode.class))
+                               .intercept(MethodDelegation.to(BBHelperMovingNodeMultiDC.class))
                                // Defer class loading until all dependencies are loaded
                                .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
                                .load(cl, ClassLoadingStrategy.Default.INJECTION);
