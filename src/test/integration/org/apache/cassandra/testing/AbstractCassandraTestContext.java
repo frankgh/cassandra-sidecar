@@ -18,6 +18,9 @@
 
 package org.apache.cassandra.testing;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.cassandra.distributed.UpgradeableCluster;
 
 /**
@@ -25,6 +28,8 @@ import org.apache.cassandra.distributed.UpgradeableCluster;
  */
 public abstract class AbstractCassandraTestContext implements AutoCloseable
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractCassandraTestContext.class);
+
     public final SimpleCassandraVersion version;
     protected UpgradeableCluster cluster;
 
@@ -56,7 +61,14 @@ public abstract class AbstractCassandraTestContext implements AutoCloseable
     {
         if (cluster != null)
         {
-            cluster.close();
+            try
+            {
+                cluster.close();
+            }
+            catch (Exception ex)
+            {
+                LOGGER.warn("Unable to cleanly shutdown the cluster", ex);
+            }
         }
     }
 }
