@@ -343,7 +343,8 @@ tasks.register("integrationTest", Test) {
     shouldRunAfter test
     forkEvery = 1 // DTest framework tends to have issues without forkEvery test class
     maxHeapSize = "8g"
-    maxParallelForks = 2
+    // Uncomment below to enable parallel runs for integration tests
+    //maxParallelForks = Runtime.runtime.availableProcessors().intdiv(2) ?: 1
 }
 
 // copy the user documentation to the final build
