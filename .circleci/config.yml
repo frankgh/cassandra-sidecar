@@ -78,12 +78,12 @@ jobs:
   integration_cassandra_40_java8:
     docker:
      - image: circleci/openjdk:8-jdk-stretch
-    resource_class: 2xlarge
+    resource_class: xlarge
     steps:
      - checkout
      # Cassandra 4.0 jar seems to be missing some dependencies, so we use 4.1 here (this is what we currently do)
      - run: BRANCHES="cassandra-4.0 cassandra-4.1" scripts/build-dtest-jars.sh
-     - run: ./gradlew -PdtestVersion=4.1.4 -Dcassandra.sidecar.versions_to_test="4.0" checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
+     - run: ./gradlew -PdtestVersion=4.1.4 -Dcassandra.sidecar.versions_to_test="4.0" --info checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
 
      - store_artifacts:
          path: build/reports
@@ -95,11 +95,11 @@ jobs:
   integration_cassandra_41_java8:
     docker:
      - image: circleci/openjdk:8-jdk-stretch
-    resource_class: 2xlarge
+    resource_class: xlarge
     steps:
      - checkout
      - run: BRANCHES="cassandra-4.1" scripts/build-dtest-jars.sh
-     - run: ./gradlew -PdtestVersion=4.1.4 -Dcassandra.sidecar.versions_to_test="4.1" checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
+     - run: ./gradlew -PdtestVersion=4.1.4 -Dcassandra.sidecar.versions_to_test="4.1" --info checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
 
      - store_artifacts:
          path: build/reports
@@ -128,12 +128,12 @@ jobs:
   integration_cassandra_40_java11:
     docker:
       - image: circleci/openjdk:11-jdk-stretch
-    resource_class: 2xlarge
+    resource_class: xlarge
     steps:
       - checkout
       # Cassandra 4.0 jar seems to be missing some dependencies, so we use 4.1 here (this is what we currently do)
       - run: BRANCHES="cassandra-4.0 cassandra-4.1" CASSANDRA_USE_JDK11=true scripts/build-dtest-jars.sh
-      - run: ./gradlew -PdtestVersion=4.1.4 -Dcassandra.sidecar.versions_to_test="4.0" checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
+      - run: ./gradlew -PdtestVersion=4.1.4 -Dcassandra.sidecar.versions_to_test="4.0" --info checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
 
       - store_artifacts:
           path: build/reports
@@ -145,11 +145,11 @@ jobs:
   integration_cassandra_50_java11:
     docker:
       - image: circleci/openjdk:11-jdk-stretch
-    resource_class: 2xlarge
+    resource_class: xlarge
     steps:
       - checkout
       - run: BRANCHES="cassandra-5.0" scripts/build-dtest-jars.sh
-      - run: ./gradlew -PdtestVersion=5.0-alpha2 -Dcassandra.sidecar.versions_to_test="5.0" checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
+      - run: ./gradlew -PdtestVersion=5.0-alpha2 -Dcassandra.sidecar.versions_to_test="5.0" --info checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
 
       - store_artifacts:
           path: build/reports
@@ -161,11 +161,11 @@ jobs:
   integration_cassandra_trunk_java11:
     docker:
       - image: circleci/openjdk:11-jdk-stretch
-    resource_class: 2xlarge
+    resource_class: xlarge
     steps:
       - checkout
       - run: BRANCHES="trunk" scripts/build-dtest-jars.sh
-      - run: ./gradlew -PdtestVersion=5.1 -Dcassandra.sidecar.versions_to_test="5.1" checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
+      - run: ./gradlew -PdtestVersion=5.1 -Dcassandra.sidecar.versions_to_test="5.1" --info checkstyleIntegrationTest spotbugsIntegrationTest integrationTest --stacktrace
 
       - store_artifacts:
           path: build/reports
