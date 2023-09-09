@@ -76,8 +76,8 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
                                cassandraTestContext,
                                1,
                                BBHelperSingleLeavingNode::install,
-                               BBHelperSingleLeavingNode.TRANSIENT_STATE_START,
-                               BBHelperSingleLeavingNode.TRANSIENT_STATE_END,
+                               BBHelperSingleLeavingNode.transientStateStart,
+                               BBHelperSingleLeavingNode.transientStateEnd,
                                generateExpectedRangeMappingSingleLeavingNode());
     }
 
@@ -90,8 +90,8 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
                                cassandraTestContext,
                                2,
                                BBHelperMultipleLeavingNodes::install,
-                               BBHelperMultipleLeavingNodes.TRANSIENT_STATE_START,
-                               BBHelperMultipleLeavingNodes.TRANSIENT_STATE_END,
+                               BBHelperMultipleLeavingNodes.transientStateStart,
+                               BBHelperMultipleLeavingNodes.transientStateEnd,
                                generateExpectedRangeMappingMultipleLeavingNodes());
     }
 
@@ -104,8 +104,8 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
                                cassandraTestContext,
                                3,
                                BBHelperHalveClusterSize::install,
-                               BBHelperHalveClusterSize.TRANSIENT_STATE_START,
-                               BBHelperHalveClusterSize.TRANSIENT_STATE_END,
+                               BBHelperHalveClusterSize.transientStateStart,
+                               BBHelperHalveClusterSize.transientStateEnd,
                                generateExpectedRangeMappingHalveClusterSize());
     }
 
@@ -121,8 +121,8 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
 
         runLeavingTestScenario(context,
                                leavingNodesPerDC,
-                               BBHelperLeavingNodesMultiDC.TRANSIENT_STATE_START,
-                               BBHelperLeavingNodesMultiDC.TRANSIENT_STATE_END,
+                               BBHelperLeavingNodesMultiDC.transientStateStart,
+                               BBHelperLeavingNodesMultiDC.transientStateEnd,
                                cluster,
                                generateExpectedRangeMappingLeavingNodeMultiDC());
     }
@@ -139,8 +139,8 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
         = generateExpectedRangeHalveClusterSizeMultiDC();
         runLeavingTestScenario(context,
                                leavingNodesPerDC,
-                               BBHelperHalveClusterMultiDC.TRANSIENT_STATE_START,
-                               BBHelperHalveClusterMultiDC.TRANSIENT_STATE_END,
+                               BBHelperHalveClusterMultiDC.transientStateStart,
+                               BBHelperHalveClusterMultiDC.transientStateEnd,
                                cluster,
                                expectedRangeMappings);
     }
@@ -599,8 +599,8 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
     @Shared
     public static class BBHelperSingleLeavingNode
     {
-        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(1);
-        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(1);
+        public static CountDownLatch transientStateStart = new CountDownLatch(1);
+        public static CountDownLatch transientStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -623,15 +623,15 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
         @SuppressWarnings("unused")
         public static void unbootstrap(@SuperCall Callable<?> orig) throws Exception
         {
-            TRANSIENT_STATE_START.countDown();
-            Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             orig.call();
         }
 
         public static void reset()
         {
-            TRANSIENT_STATE_START = new CountDownLatch(1);
-            TRANSIENT_STATE_END = new CountDownLatch(1);
+            transientStateStart = new CountDownLatch(1);
+            transientStateEnd = new CountDownLatch(1);
         }
     }
 
@@ -641,8 +641,8 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
     @Shared
     public static class BBHelperMultipleLeavingNodes
     {
-        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(2);
-        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(2);
+        public static CountDownLatch transientStateStart = new CountDownLatch(2);
+        public static CountDownLatch transientStateEnd = new CountDownLatch(2);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -665,15 +665,15 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
         @SuppressWarnings("unused")
         public static void unbootstrap(@SuperCall Callable<?> orig) throws Exception
         {
-            TRANSIENT_STATE_START.countDown();
-            Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             orig.call();
         }
 
         public static void reset()
         {
-            TRANSIENT_STATE_START = new CountDownLatch(2);
-            TRANSIENT_STATE_END = new CountDownLatch(2);
+            transientStateStart = new CountDownLatch(2);
+            transientStateEnd = new CountDownLatch(2);
         }
     }
 
@@ -683,8 +683,8 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
     @Shared
     public static class BBHelperHalveClusterSize
     {
-        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(3);
-        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(3);
+        public static CountDownLatch transientStateStart = new CountDownLatch(3);
+        public static CountDownLatch transientStateEnd = new CountDownLatch(3);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -707,15 +707,15 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
         @SuppressWarnings("unused")
         public static void unbootstrap(@SuperCall Callable<?> orig) throws Exception
         {
-            TRANSIENT_STATE_START.countDown();
-            Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             orig.call();
         }
 
         public static void reset()
         {
-            TRANSIENT_STATE_START = new CountDownLatch(3);
-            TRANSIENT_STATE_END = new CountDownLatch(3);
+            transientStateStart = new CountDownLatch(3);
+            transientStateEnd = new CountDownLatch(3);
         }
     }
 
@@ -725,8 +725,8 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
     @Shared
     public static class BBHelperLeavingNodesMultiDC
     {
-        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(2);
-        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(2);
+        public static CountDownLatch transientStateStart = new CountDownLatch(2);
+        public static CountDownLatch transientStateEnd = new CountDownLatch(2);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -749,15 +749,15 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
         @SuppressWarnings("unused")
         public static void unbootstrap(@SuperCall Callable<?> orig) throws Exception
         {
-            TRANSIENT_STATE_START.countDown();
-            Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             orig.call();
         }
 
         public static void reset()
         {
-            TRANSIENT_STATE_START = new CountDownLatch(2);
-            TRANSIENT_STATE_END = new CountDownLatch(2);
+            transientStateStart = new CountDownLatch(2);
+            transientStateEnd = new CountDownLatch(2);
         }
     }
 
@@ -767,8 +767,8 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
     @Shared
     public static class BBHelperHalveClusterMultiDC
     {
-        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(6);
-        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(6);
+        public static CountDownLatch transientStateStart = new CountDownLatch(6);
+        public static CountDownLatch transientStateEnd = new CountDownLatch(6);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -791,15 +791,15 @@ public class TokenRangeIntegrationLeavingTest extends BaseTokenRangeIntegrationT
         @SuppressWarnings("unused")
         public static void unbootstrap(@SuperCall Callable<?> orig) throws Exception
         {
-            TRANSIENT_STATE_START.countDown();
-            Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             orig.call();
         }
 
         public static void reset()
         {
-            TRANSIENT_STATE_START = new CountDownLatch(6);
-            TRANSIENT_STATE_END = new CountDownLatch(6);
+            transientStateStart = new CountDownLatch(6);
+            transientStateEnd = new CountDownLatch(6);
         }
     }
 }

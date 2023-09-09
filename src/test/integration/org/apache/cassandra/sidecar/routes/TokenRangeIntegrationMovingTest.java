@@ -92,8 +92,8 @@ public class TokenRangeIntegrationMovingTest extends BaseTokenRangeIntegrationTe
 
         long moveTarget = getMoveTargetToken(cluster);
         runMovingTestScenario(context,
-                              BBHelperMovingNode.TRANSIENT_STATE_START,
-                              BBHelperMovingNode.TRANSIENT_STATE_END,
+                              BBHelperMovingNode.transientStateStart,
+                              BBHelperMovingNode.transientStateEnd,
                               cluster,
                               generateExpectedRangeMappingMovingNode(moveTarget),
                               moveTarget);
@@ -122,8 +122,8 @@ public class TokenRangeIntegrationMovingTest extends BaseTokenRangeIntegrationTe
 
         long moveTarget = getMoveTargetToken(cluster);
         runMovingTestScenario(context,
-                              BBHelperMovingNodeMultiDC.TRANSIENT_STATE_START,
-                              BBHelperMovingNodeMultiDC.TRANSIENT_STATE_END,
+                              BBHelperMovingNodeMultiDC.transientStateStart,
+                              BBHelperMovingNodeMultiDC.transientStateEnd,
                               cluster,
                               generateExpectedRangeMappingMovingNodeMultiDC(moveTarget),
                               moveTarget);
@@ -413,8 +413,8 @@ public class TokenRangeIntegrationMovingTest extends BaseTokenRangeIntegrationTe
     @Shared
     public static class BBHelperMovingNodeMultiDC
     {
-        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(1);
-        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(1);
+        public static CountDownLatch transientStateStart = new CountDownLatch(1);
+        public static CountDownLatch transientStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -437,15 +437,15 @@ public class TokenRangeIntegrationMovingTest extends BaseTokenRangeIntegrationTe
         public static Future<?> stream(@SuperCall Callable<Future<?>> orig) throws Exception
         {
             Future<?> res = orig.call();
-            TRANSIENT_STATE_START.countDown();
-            Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             return res;
         }
 
         public static void reset()
         {
-            TRANSIENT_STATE_START = new CountDownLatch(1);
-            TRANSIENT_STATE_END = new CountDownLatch(1);
+            transientStateStart = new CountDownLatch(1);
+            transientStateEnd = new CountDownLatch(1);
         }
     }
 
@@ -455,8 +455,8 @@ public class TokenRangeIntegrationMovingTest extends BaseTokenRangeIntegrationTe
     @Shared
     public static class BBHelperMovingNode
     {
-        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(1);
-        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(1);
+        public static CountDownLatch transientStateStart = new CountDownLatch(1);
+        public static CountDownLatch transientStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -479,15 +479,15 @@ public class TokenRangeIntegrationMovingTest extends BaseTokenRangeIntegrationTe
         public static Future<?> stream(@SuperCall Callable<Future<?>> orig) throws Exception
         {
             Future<?> res = orig.call();
-            TRANSIENT_STATE_START.countDown();
-            Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             return res;
         }
 
         public static void reset()
         {
-            TRANSIENT_STATE_START = new CountDownLatch(1);
-            TRANSIENT_STATE_END = new CountDownLatch(1);
+            transientStateStart = new CountDownLatch(1);
+            transientStateEnd = new CountDownLatch(1);
         }
     }
 }

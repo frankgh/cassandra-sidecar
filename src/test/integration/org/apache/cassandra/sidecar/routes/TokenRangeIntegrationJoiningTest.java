@@ -105,8 +105,8 @@ public class TokenRangeIntegrationJoiningTest extends BaseTokenRangeIntegrationT
         runJoiningTestScenario(context,
                                cassandraTestContext,
                                BBHelperSingleJoiningNode::install,
-                               BBHelperSingleJoiningNode.TRANSIENT_STATE_START,
-                               BBHelperSingleJoiningNode.TRANSIENT_STATE_END,
+                               BBHelperSingleJoiningNode.transientStateStart,
+                               BBHelperSingleJoiningNode.transientStateEnd,
                                generateExpectedRangeMappingSingleJoiningNode());
     }
 
@@ -119,8 +119,8 @@ public class TokenRangeIntegrationJoiningTest extends BaseTokenRangeIntegrationT
         runJoiningTestScenario(context,
                                cassandraTestContext,
                                BBHelperMultipleJoiningNodes::install,
-                               BBHelperMultipleJoiningNodes.TRANSIENT_STATE_START,
-                               BBHelperMultipleJoiningNodes.TRANSIENT_STATE_END,
+                               BBHelperMultipleJoiningNodes.transientStateStart,
+                               BBHelperMultipleJoiningNodes.transientStateEnd,
                                generateExpectedRangeMappingMultipleJoiningNodes());
     }
 
@@ -132,8 +132,8 @@ public class TokenRangeIntegrationJoiningTest extends BaseTokenRangeIntegrationT
         runJoiningTestScenario(context,
                                cassandraTestContext,
                                BBHelperDoubleClusterSize::install,
-                               BBHelperDoubleClusterSize.TRANSIENT_STATE_START,
-                               BBHelperDoubleClusterSize.TRANSIENT_STATE_END,
+                               BBHelperDoubleClusterSize.transientStateStart,
+                               BBHelperDoubleClusterSize.transientStateEnd,
                                generateExpectedRangeMappingDoubleClusterSize());
     }
 
@@ -148,8 +148,8 @@ public class TokenRangeIntegrationJoiningTest extends BaseTokenRangeIntegrationT
 
         runJoiningTestScenario(context,
                                cassandraTestContext,
-                               BBHelperMultiDC.TRANSIENT_STATE_START,
-                               BBHelperMultiDC.TRANSIENT_STATE_END,
+                               BBHelperMultiDC.transientStateStart,
+                               BBHelperMultiDC.transientStateEnd,
                                cluster,
                                generateExpectedRanges(false),
                                generateExpectedRangeMappingOneof2DCs(),
@@ -167,8 +167,8 @@ public class TokenRangeIntegrationJoiningTest extends BaseTokenRangeIntegrationT
 
         runJoiningTestScenario(context,
                                cassandraTestContext,
-                               BBHelperDoubleClusterMultiDC.TRANSIENT_STATE_START,
-                               BBHelperDoubleClusterMultiDC.TRANSIENT_STATE_END,
+                               BBHelperDoubleClusterMultiDC.transientStateStart,
+                               BBHelperDoubleClusterMultiDC.transientStateEnd,
                                cluster,
                                generateExpectedRanges(),
                                generateExpectedRangeDoubleClusterSizeMultiDC(),
@@ -821,8 +821,8 @@ public class TokenRangeIntegrationJoiningTest extends BaseTokenRangeIntegrationT
     @Shared
     public static class BBHelperSingleJoiningNode
     {
-        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(1);
-        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(1);
+        public static CountDownLatch transientStateStart = new CountDownLatch(1);
+        public static CountDownLatch transientStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -848,15 +848,15 @@ public class TokenRangeIntegrationJoiningTest extends BaseTokenRangeIntegrationT
         {
             boolean result = orig.call();
             // trigger bootstrap start and wait until bootstrap is ready from test
-            TRANSIENT_STATE_START.countDown();
-            Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             return result;
         }
 
         public static void reset()
         {
-            TRANSIENT_STATE_START = new CountDownLatch(1);
-            TRANSIENT_STATE_END = new CountDownLatch(1);
+            transientStateStart = new CountDownLatch(1);
+            transientStateEnd = new CountDownLatch(1);
         }
     }
 
@@ -866,8 +866,8 @@ public class TokenRangeIntegrationJoiningTest extends BaseTokenRangeIntegrationT
     @Shared
     public static class BBHelperMultipleJoiningNodes
     {
-        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(2);
-        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(2);
+        public static CountDownLatch transientStateStart = new CountDownLatch(2);
+        public static CountDownLatch transientStateEnd = new CountDownLatch(2);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -893,15 +893,15 @@ public class TokenRangeIntegrationJoiningTest extends BaseTokenRangeIntegrationT
         {
             boolean result = orig.call();
             // trigger bootstrap start and wait until bootstrap is ready from test
-            TRANSIENT_STATE_START.countDown();
-            Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             return result;
         }
 
         public static void reset()
         {
-            TRANSIENT_STATE_START = new CountDownLatch(2);
-            TRANSIENT_STATE_END = new CountDownLatch(2);
+            transientStateStart = new CountDownLatch(2);
+            transientStateEnd = new CountDownLatch(2);
         }
     }
 
@@ -911,8 +911,8 @@ public class TokenRangeIntegrationJoiningTest extends BaseTokenRangeIntegrationT
     @Shared
     public static class BBHelperDoubleClusterSize
     {
-        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(5);
-        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(5);
+        public static CountDownLatch transientStateStart = new CountDownLatch(5);
+        public static CountDownLatch transientStateEnd = new CountDownLatch(5);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -938,15 +938,15 @@ public class TokenRangeIntegrationJoiningTest extends BaseTokenRangeIntegrationT
         {
             boolean result = orig.call();
             // trigger bootstrap start and wait until bootstrap is ready from test
-            TRANSIENT_STATE_START.countDown();
-            Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             return result;
         }
 
         public static void reset()
         {
-            TRANSIENT_STATE_START = new CountDownLatch(5);
-            TRANSIENT_STATE_END = new CountDownLatch(5);
+            transientStateStart = new CountDownLatch(5);
+            transientStateEnd = new CountDownLatch(5);
         }
     }
 
@@ -956,8 +956,8 @@ public class TokenRangeIntegrationJoiningTest extends BaseTokenRangeIntegrationT
     @Shared
     public static class BBHelperDoubleClusterMultiDC
     {
-        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(6);
-        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(6);
+        public static CountDownLatch transientStateStart = new CountDownLatch(6);
+        public static CountDownLatch transientStateEnd = new CountDownLatch(6);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -983,15 +983,15 @@ public class TokenRangeIntegrationJoiningTest extends BaseTokenRangeIntegrationT
         {
             boolean result = orig.call();
             // trigger bootstrap start and wait until bootstrap is ready from test
-            TRANSIENT_STATE_START.countDown();
-            Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             return result;
         }
 
         public static void reset()
         {
-            TRANSIENT_STATE_START = new CountDownLatch(6);
-            TRANSIENT_STATE_END = new CountDownLatch(6);
+            transientStateStart = new CountDownLatch(6);
+            transientStateEnd = new CountDownLatch(6);
         }
     }
 
@@ -1001,8 +1001,8 @@ public class TokenRangeIntegrationJoiningTest extends BaseTokenRangeIntegrationT
     @Shared
     public static class BBHelperMultiDC
     {
-        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(2);
-        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(2);
+        public static CountDownLatch transientStateStart = new CountDownLatch(2);
+        public static CountDownLatch transientStateEnd = new CountDownLatch(2);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -1028,15 +1028,15 @@ public class TokenRangeIntegrationJoiningTest extends BaseTokenRangeIntegrationT
         {
             boolean result = orig.call();
             // trigger bootstrap start and wait until bootstrap is ready from test
-            TRANSIENT_STATE_START.countDown();
-            Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             return result;
         }
 
         public static void reset()
         {
-            TRANSIENT_STATE_START = new CountDownLatch(2);
-            TRANSIENT_STATE_END = new CountDownLatch(2);
+            transientStateStart = new CountDownLatch(2);
+            transientStateEnd = new CountDownLatch(2);
         }
     }
 }

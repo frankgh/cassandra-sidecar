@@ -82,8 +82,8 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
         runReplacementTestScenario(context,
                                    cassandraTestContext,
                                    BBHelperReplacementsNode::install,
-                                   BBHelperReplacementsNode.TRANSIENT_STATE_START,
-                                   BBHelperReplacementsNode.TRANSIENT_STATE_END,
+                                   BBHelperReplacementsNode.transientStateStart,
+                                   BBHelperReplacementsNode.transientStateEnd,
                                    generateExpectedRangeMappingNodeReplacement());
     }
 
@@ -99,8 +99,8 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
         List<IUpgradeableInstance> nodesToRemove = Arrays.asList(cluster.get(3), cluster.get(cluster.size()));
         runReplacementTestScenario(context,
                                    cassandraTestContext,
-                                   BBHelperReplacementsMultiDC.TRANSIENT_STATE_START,
-                                   BBHelperReplacementsMultiDC.TRANSIENT_STATE_END,
+                                   BBHelperReplacementsMultiDC.transientStateStart,
+                                   BBHelperReplacementsMultiDC.transientStateEnd,
                                    cluster,
                                    nodesToRemove,
                                    generateExpectedRangeMappingReplacementMultiDC());
@@ -143,9 +143,9 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
                                             Map<String, Map<Range<BigInteger>, List<String>>> expectedRangeMappings)
     throws Exception
     {
+        CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         try
         {
-            CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
             Set<String> dcReplication;
             if (annotation.numDcs() > 1)
             {
@@ -218,8 +218,7 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
         }
         finally
         {
-            for (int i = 0;
-                 i < (cassandraTestContext.annotation.newNodesPerDc() * cassandraTestContext.annotation.numDcs()); i++)
+            for (int i = 0; i < (annotation.newNodesPerDc() * annotation.numDcs()); i++)
             {
                 transientStateEnd.countDown();
             }
@@ -256,7 +255,7 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
                 properties.with("cassandra.replace_address_first_boot", remAddress + ":" + remPort);
             })).start();
 
-            Uninterruptibles.awaitUninterruptibly(BBHelperReplacementsMultiDC.NODE_START, 2, TimeUnit.MINUTES);
+            Uninterruptibles.awaitUninterruptibly(BBHelperReplacementsMultiDC.nodeStart, 2, TimeUnit.MINUTES);
             newNodes.add(replacement);
         }
         return newNodes;
@@ -430,8 +429,8 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
     @Shared
     public static class BBHelperReplacementsNode
     {
-        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(1);
-        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(1);
+        public static CountDownLatch transientStateStart = new CountDownLatch(1);
+        public static CountDownLatch transientStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -457,15 +456,15 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
         {
             boolean result = orig.call();
             // trigger bootstrap start and wait until bootstrap is ready from test
-            TRANSIENT_STATE_START.countDown();
-            Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             return result;
         }
 
         public static void reset()
         {
-            TRANSIENT_STATE_START = new CountDownLatch(1);
-            TRANSIENT_STATE_END = new CountDownLatch(1);
+            transientStateStart = new CountDownLatch(1);
+            transientStateEnd = new CountDownLatch(1);
         }
     }
 
@@ -477,9 +476,9 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
     {
         // Additional latch used here to sequentially start the 2 new nodes to isolate the loading
         // of the shared Cassandra system property REPLACE_ADDRESS_FIRST_BOOT across instances
-        public static CountDownLatch NODE_START = new CountDownLatch(1);
-        public static CountDownLatch TRANSIENT_STATE_START = new CountDownLatch(2);
-        public static CountDownLatch TRANSIENT_STATE_END = new CountDownLatch(2);
+        public static CountDownLatch nodeStart = new CountDownLatch(1);
+        public static CountDownLatch transientStateStart = new CountDownLatch(2);
+        public static CountDownLatch transientStateEnd = new CountDownLatch(2);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -504,18 +503,18 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
                                         @SuperCall Callable<Boolean> orig) throws Exception
         {
             boolean result = orig.call();
-            NODE_START.countDown();
+            nodeStart.countDown();
             // trigger bootstrap start and wait until bootstrap is ready from test
-            TRANSIENT_STATE_START.countDown();
-            Uninterruptibles.awaitUninterruptibly(TRANSIENT_STATE_END);
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             return result;
         }
 
         public static void reset()
         {
-            NODE_START = new CountDownLatch(1);
-            TRANSIENT_STATE_START = new CountDownLatch(2);
-            TRANSIENT_STATE_END = new CountDownLatch(2);
+            nodeStart = new CountDownLatch(1);
+            transientStateStart = new CountDownLatch(2);
+            transientStateEnd = new CountDownLatch(2);
         }
     }
 }
