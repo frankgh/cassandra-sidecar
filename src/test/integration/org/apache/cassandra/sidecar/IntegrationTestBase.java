@@ -118,7 +118,7 @@ public abstract class IntegrationTestBase
         tester.accept(client);
 
         // wait until the test completes
-        assertThat(context.awaitCompletion(10, TimeUnit.MINUTES)).isTrue();
+        assertThat(context.awaitCompletion(2, TimeUnit.MINUTES)).isTrue();
     }
 
     protected void createTestKeyspace()
