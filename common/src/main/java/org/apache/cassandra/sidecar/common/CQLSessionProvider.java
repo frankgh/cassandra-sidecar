@@ -140,6 +140,7 @@ public class CQLSessionProvider
             try
             {
                 localSession.getCluster().closeAsync().get(1, TimeUnit.MINUTES);
+                localSession.closeAsync().get(1, TimeUnit.MINUTES);
             }
             catch (InterruptedException e)
             {

@@ -111,11 +111,12 @@ public class CassandraSidecarTestContext implements AutoCloseable
 
     public UpgradeableCluster cluster()
     {
-        if (abstractCassandraTestContext.cluster() == null)
+        UpgradeableCluster cluster = abstractCassandraTestContext.cluster();
+        if (cluster == null)
         {
             throw new RuntimeException("The cluster must be built before it can be used");
         }
-        return abstractCassandraTestContext.cluster();
+        return cluster;
     }
 
     public InstancesConfig instancesConfig()
@@ -123,6 +124,7 @@ public class CassandraSidecarTestContext implements AutoCloseable
         if (instancesConfig == null
             || instancesConfig.instances().size() != cluster().size()) // rebuild instances config if cluster changed
         {
+            close();
             setInstancesConfig();
         }
         return this.instancesConfig;

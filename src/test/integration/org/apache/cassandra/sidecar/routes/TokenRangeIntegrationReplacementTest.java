@@ -98,7 +98,6 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
 
         List<IUpgradeableInstance> nodesToRemove = Arrays.asList(cluster.get(3), cluster.get(cluster.size()));
         runReplacementTestScenario(context,
-                                   cassandraTestContext,
                                    BBHelperReplacementsMultiDC.transientStateStart,
                                    BBHelperReplacementsMultiDC.transientStateEnd,
                                    cluster,
@@ -126,7 +125,6 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
 
         List<IUpgradeableInstance> nodesToRemove = Collections.singletonList(cluster.get(cluster.size()));
         runReplacementTestScenario(context,
-                                   cassandraTestContext,
                                    transientStateStart,
                                    transientStateEnd,
                                    cluster,
@@ -135,7 +133,6 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
     }
 
     private void runReplacementTestScenario(VertxTestContext context,
-                                            ConfigurableCassandraTestContext cassandraTestContext,
                                             CountDownLatch transientStateStart,
                                             CountDownLatch transientStateEnd,
                                             UpgradeableCluster cluster,
@@ -236,13 +233,16 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
             IInstanceConfig removedConfig = removed.config();
             String remAddress = removedConfig.broadcastAddress().getAddress().getHostAddress();
             int remPort = removedConfig.getInt("storage_port");
-            IUpgradeableInstance replacement = ClusterUtils.addInstance(cluster, removedConfig,
-                                                                        c -> {
-                                                                            c.set("auto_bootstrap", true);
-                                                                            c.with(Feature.GOSSIP,
-                                                                                   Feature.JMX,
-                                                                                   Feature.NATIVE_PROTOCOL);
-                                                                        });
+//            int remPort = removedConfig.broadcastAddress().getPort();
+            IUpgradeableInstance replacement =
+            ClusterUtils.addInstance(cluster, removedConfig,
+                                     c -> {
+                                         c.set("auto_bootstrap", true);
+                                         c.set("dtest.api.startup.failure_as_shutdown", false);
+                                         c.with(Feature.GOSSIP,
+                                                Feature.JMX,
+                                                Feature.NATIVE_PROTOCOL);
+                                     });
 
             new Thread(() -> ClusterUtils.start(replacement, (properties) -> {
                 properties.set(CassandraRelevantProperties.BOOTSTRAP_SKIP_SCHEMA_CHECK, true);
@@ -252,6 +252,8 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
                                 Long.toString(TimeUnit.SECONDS.toMillis(30L)));
                 properties.with("cassandra.ring_delay_ms",
                                 Long.toString(TimeUnit.SECONDS.toMillis(10L)));
+                // This property tells cassandra that this new instance is replacing the node with
+                // address remAddress and port remPort
                 properties.with("cassandra.replace_address_first_boot", remAddress + ":" + remPort);
             })).start();
 
