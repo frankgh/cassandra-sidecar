@@ -233,7 +233,6 @@ public class TokenRangeIntegrationReplacementTest extends BaseTokenRangeIntegrat
             IInstanceConfig removedConfig = removed.config();
             String remAddress = removedConfig.broadcastAddress().getAddress().getHostAddress();
             int remPort = removedConfig.getInt("storage_port");
-//            int remPort = removedConfig.broadcastAddress().getPort();
             IUpgradeableInstance replacement =
             ClusterUtils.addInstance(cluster, removedConfig,
                                      c -> {
