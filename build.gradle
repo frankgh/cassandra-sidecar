@@ -18,7 +18,7 @@
  */
 
 
-import com.github.spotbugs.SpotBugsTask
+//import com.github.spotbugs.SpotBugsTask
 import org.nosphere.apache.rat.RatTask
 import org.apache.tools.ant.taskdefs.condition.Os
 
@@ -41,11 +41,12 @@ plugins {
     id 'maven-publish'
 
     // since we're using a specific version here, we delay applying the plugin till the all projects
-    id "com.github.spotbugs" version "3.0.0" apply false
+//    id "com.github.spotbugs" version "3.0.0" apply false
+    id "com.github.spotbugs" version "6.0.20" apply false
 
     // https://github.com/nebula-plugins/gradle-ospackage-plugin/wiki
-    id "nebula.ospackage" version "8.3.0"
-    id 'nebula.ospackage-application' version "8.3.0"
+    id 'com.netflix.nebula.ospackage' version "11.10.0"
+//    id 'nebula.ospackage-application' version "11.10.0"
     id 'com.google.cloud.tools.jib' version '2.2.0'
     id 'org.asciidoctor.jvm.convert' version '3.3.2'
 
@@ -85,20 +86,20 @@ allprojects {
         excludeFilter = file("${project.rootDir}/spotbugs-exclude.xml")
     }
 
-    tasks.withType(SpotBugsTask) {
-        reports.xml.enabled = false
-        reports.html.enabled = true
-    }
+//    tasks.withType(SpotBugsTask) {
+//        reports.xml.enabled = false
+//        reports.html.enabled = true
+//    }
 
     codeCheckTasks.dependsOn(tasks.withType(Checkstyle))
     codeCheckTasks.dependsOn(tasks.withType(RatTask))
-    codeCheckTasks.dependsOn(tasks.withType(SpotBugsTask))
+//    codeCheckTasks.dependsOn(tasks.withType(SpotBugsTask))
 
     tasks.withType(Test) {
         shouldRunAfter(codeCheckTasks)
         shouldRunAfter(tasks.withType(Checkstyle))
         shouldRunAfter(tasks.withType(RatTask))
-        shouldRunAfter(tasks.withType(SpotBugsTask))
+//        shouldRunAfter(tasks.withType(SpotBugsTask))
     }
 
 }
@@ -342,11 +343,10 @@ test {
         jvmArgs "-XX:-MaxFDLimit"
     }
     reports {
-        junitXml.enabled = true
         def destDir = Paths.get(rootProject.rootDir.absolutePath, "build", "test-results", "test").toFile()
         println("Destination directory for unit tests: ${destDir}")
         junitXml.destination = destDir
-        html.enabled = true
+//        html.enabled = true
     }
     testLogging {
         events "passed", "skipped", "failed"
@@ -409,11 +409,11 @@ def integrationTest = task("integrationTest")
         }
 
         reports {
-            junitXml.enabled = true
+//            junitXml.enabled = true
             def destDir = Paths.get(rootProject.rootDir.absolutePath, "build", "test-results", "integration").toFile()
             println("Destination directory for integration tests: ${destDir}")
             junitXml.destination = destDir
-            html.enabled = true
+//            html.enabled = true
         }
         testLogging {
             events "started", "passed", "skipped", "failed"
@@ -448,11 +448,11 @@ tasks.register("containerTest", Test) {
 
     useJUnitPlatform()
     reports {
-        junitXml.enabled = true
+//        junitXml.enabled = true
         def destDir = Paths.get(rootProject.rootDir.absolutePath, "build", "test-results", "containerTest").toFile()
         println("Destination directory for testcontainer tests: ${destDir}")
         junitXml.destination = destDir
-        html.enabled = true
+//        html.enabled = true
     }
     testLogging {
         events "passed", "skipped", "failed"

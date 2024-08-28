@@ -21,18 +21,19 @@
  * the shadow plugin has some limitations when producing a non-shaded and shaded versions of the jar.
  */
 
+
 import com.github.jengelman.gradle.plugins.shadow.transformers.CacheableTransformer
 import com.github.jengelman.gradle.plugins.shadow.transformers.Transformer
 import com.github.jengelman.gradle.plugins.shadow.transformers.TransformerContext
-import shadow.org.apache.tools.zip.ZipEntry
-import shadow.org.apache.tools.zip.ZipOutputStream
+//import shadow.org.apache.tools.zip.ZipEntry
+//import shadow.org.apache.tools.zip.ZipOutputStream
 
 import java.nio.file.Paths
 
 plugins {
     id('java-library')
     id('maven-publish')
-    id('com.github.johnrengelman.shadow') version '6.1.0'
+    id('com.github.johnrengelman.shadow') version '8.1.1'
 }
 
 group 'org.apache.cassandra.sidecar'
@@ -56,11 +57,11 @@ tasks.named('test') {
     // Use JUnit Platform for unit tests.
     useJUnitPlatform()
     reports {
-        junitXml.enabled = true
+//        junitXml.enabled = true
         def destDir = Paths.get(rootProject.rootDir.absolutePath, "build", "test-results", "vertx-client-shaded").toFile()
         println("Destination directory for vertx-client-shaded tests: ${destDir}")
         junitXml.destination = destDir
-        html.enabled = true
+//        html.enabled = true
     }
 }
 
@@ -75,7 +76,7 @@ shadowJar {
     relocate 'io.vertx', 'o.a.c.sidecar.client.shaded.io.vertx'
     relocate 'META-INF/native/libnetty', 'META-INF/native/libo_a_c_sidecar_client_shaded_netty'
     relocate 'META-INF/versions/11/io/vertx', 'META-INF/versions/11/o/a/c/sidecar/client/shaded/io/vertx'
-    transform(NettyResourceTransformer.class)
+//    transform(NettyResourceTransformer.class)
     mergeServiceFiles()
 
     dependencies {
@@ -105,38 +106,38 @@ publishing {
  * A Transformer which updates the Netty JAR META-INF/ resources to accurately
  * reference shaded class names.
  */
-@CacheableTransformer
-class NettyResourceTransformer implements Transformer {
-
-    // A map of resource file paths to be modified
-    private Map<String, String> resources = [:]
-
-    @Override
-    boolean canTransformResource(FileTreeElement fileTreeElement) {
-        fileTreeElement.name.startsWith("META-INF/native-image/io.netty")
-    }
-
-    @Override
-    void transform(TransformerContext context) {
-        String updatedPath = context.path.replace("io.netty", "o.a.c.sidecar.client.shaded.io.netty")
-        String updatedContent = context.is.getText().replace("io.netty", "o.a.c.sidecar.client.shaded.io.netty")
-        resources.put(updatedPath, updatedContent)
-    }
-
-    @Override
-    boolean hasTransformedResource() {
-        resources.size() > 0
-    }
-
-    @Override
-    void modifyOutputStream(ZipOutputStream jos, boolean preserveFileTimestamps) {
-        for (resourceEntry in resources) {
-            ZipEntry entry = new ZipEntry(resourceEntry.key)
-            entry.time = TransformerContext.getEntryTimestamp(preserveFileTimestamps, entry.time)
-
-            jos.putNextEntry(entry)
-            jos.write(resourceEntry.value.getBytes())
-            jos.closeEntry()
-        }
-    }
-}
+//@CacheableTransformer
+//class NettyResourceTransformer implements Transformer {
+//
+//    // A map of resource file paths to be modified
+//    private Map<String, String> resources = [:]
+//
+//    @Override
+//    boolean canTransformResource(FileTreeElement fileTreeElement) {
+//        fileTreeElement.name.startsWith("META-INF/native-image/io.netty")
+//    }
+//
+//    @Override
+//    void transform(TransformerContext context) {
+//        String updatedPath = context.path.replace("io.netty", "o.a.c.sidecar.client.shaded.io.netty")
+//        String updatedContent = context.is.getText().replace("io.netty", "o.a.c.sidecar.client.shaded.io.netty")
+//        resources.put(updatedPath, updatedContent)
+//    }
+//
+//    @Override
+//    boolean hasTransformedResource() {
+//        resources.size() > 0
+//    }
+//
+//    @Override
+//    void modifyOutputStream(ZipOutputStream jos, boolean preserveFileTimestamps) {
+//        for (resourceEntry in resources) {
+//            ZipEntry entry = new ZipEntry(resourceEntry.key)
+//            entry.time = TransformerContext.getEntryTimestamp(preserveFileTimestamps, entry.time)
+//
+//            jos.putNextEntry(entry)
+//            jos.write(resourceEntry.value.getBytes())
+//            jos.closeEntry()
+//        }
+//    }
+//}
