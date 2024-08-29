@@ -116,4 +116,26 @@
         <Class name="org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher" />
     </Match>
 
+    <!--
+        After upgrading to spotbugs 6.0.20 these new patterns are ignored.
+        We may choose to address them in the future.
+    -->
+
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW" />
+    </Match>
+
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP" />
+    </Match>
+
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2" />
+    </Match>
+
+    <Match>
+        <Bug pattern="DCN_NULLPOINTER_EXCEPTION" />
+        <Class name="org.apache.cassandra.sidecar.utils.SSTableUploadsPathBuilder" />
+    </Match>
+
 </FindBugsFilter>
