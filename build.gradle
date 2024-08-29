@@ -345,8 +345,14 @@ test {
     reports {
         def destDir = Paths.get(rootProject.rootDir.absolutePath, "build", "test-results", "test").toFile()
         println("Destination directory for unit tests: ${destDir}")
-        junitXml.destination = destDir
-//        html.enabled = true
+        junitXml {
+            enabled true
+            destination = destDir
+        }
+        html {
+            enabled true
+            destination = destDir
+        }
     }
     testLogging {
         events "passed", "skipped", "failed"

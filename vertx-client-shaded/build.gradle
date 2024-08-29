@@ -53,15 +53,20 @@ dependencies {
     testImplementation(project(path: ':vertx-client-shaded', configuration: 'shadow'))
 }
 
-tasks.named('test') {
+test {
     // Use JUnit Platform for unit tests.
     useJUnitPlatform()
     reports {
-//        junitXml.enabled = true
         def destDir = Paths.get(rootProject.rootDir.absolutePath, "build", "test-results", "vertx-client-shaded").toFile()
         println("Destination directory for vertx-client-shaded tests: ${destDir}")
-        junitXml.destination = destDir
-//        html.enabled = true
+        junitXml {
+            enabled true
+            destination = destDir
+        }
+        html {
+            enabled true
+            destination = destDir
+        }
     }
 }
 

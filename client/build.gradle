@@ -50,11 +50,16 @@ test {
     }
     maxParallelForks = Runtime.runtime.availableProcessors().intdiv(2) ?: 1
     reports {
-//        junitXml.enabled = true
         def destDir = Paths.get(rootProject.rootDir.absolutePath, "build", "test-results", "client").toFile()
         println("Destination directory for client tests: ${destDir}")
-        junitXml.destination = destDir
-//        html.enabled = true
+        junitXml {
+            enabled true
+            destination = destDir
+        }
+        html {
+            enabled true
+            destination = destDir
+        }
     }
 }
 
