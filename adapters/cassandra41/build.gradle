@@ -42,11 +42,11 @@ test {
     }
     maxParallelForks = Runtime.runtime.availableProcessors().intdiv(2) ?: 1
     reports {
-        junitXml.enabled = true
+//        junitXml.enabled = true
         def destDir = Paths.get(rootProject.rootDir.absolutePath, "build", "test-results", "adapters-cassandra41").toFile()
         println("Destination directory for adapters-cassandra41 tests: ${destDir}")
         junitXml.destination = destDir
-        html.enabled = true
+//        html.enabled = true
     }
 }
 
