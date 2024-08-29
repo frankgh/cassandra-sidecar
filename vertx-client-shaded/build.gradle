@@ -72,7 +72,7 @@ test {
 
 // Relocating a Package
 shadowJar {
-    archiveClassifier.set('')
+    archiveClassifier = null
     // Our use of Jackson should be an implementation detail - shade everything so no matter what
     // version of Jackson is available in the classpath we don't break consumers of the client
     relocate 'org.apache.cassandra.sidecar.common', 'o.a.c.sidecar.client.shaded.common'
@@ -81,7 +81,7 @@ shadowJar {
     relocate 'io.vertx', 'o.a.c.sidecar.client.shaded.io.vertx'
     relocate 'META-INF/native/libnetty', 'META-INF/native/libo_a_c_sidecar_client_shaded_netty'
     relocate 'META-INF/versions/11/io/vertx', 'META-INF/versions/11/o/a/c/sidecar/client/shaded/io/vertx'
-//    transform(NettyResourceTransformer.class)
+    transform(NettyResourceTransformer.class)
     mergeServiceFiles()
 
     dependencies {
