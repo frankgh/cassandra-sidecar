@@ -47,7 +47,7 @@ plugins {
     // https://github.com/nebula-plugins/gradle-ospackage-plugin/wiki
     id 'com.netflix.nebula.ospackage' version "11.10.0"
 //    id 'nebula.ospackage-application' version "11.10.0"
-    id 'com.google.cloud.tools.jib' version '2.2.0'
+//    id 'com.google.cloud.tools.jib' version '2.2.0'
     id 'org.asciidoctor.jvm.convert' version '3.3.2'
 
     // Release Audit Tool (RAT) plugin for checking project licenses
