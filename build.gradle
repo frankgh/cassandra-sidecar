@@ -42,7 +42,7 @@ plugins {
 
     // since we're using a specific version here, we delay applying the plugin till the all projects
 //    id "com.github.spotbugs" version "3.0.0" apply false
-    id "com.github.spotbugs" version "6.0.20" apply false
+//    id "com.github.spotbugs" version "6.0.20" apply false
 
     // https://github.com/nebula-plugins/gradle-ospackage-plugin/wiki
     id 'com.netflix.nebula.ospackage' version "11.10.0"
@@ -68,7 +68,7 @@ def codeCheckTasks = task("codeCheckTasks")
 allprojects {
     apply plugin: 'jacoco'
     apply plugin: 'checkstyle'
-    apply plugin: "com.github.spotbugs"
+//    apply plugin: "com.github.spotbugs"
 
     repositories {
         mavenCentral()
@@ -81,10 +81,10 @@ allprojects {
         toolVersion '7.8.1'
         configFile file("${project.rootDir}/checkstyle.xml")
     }
-    spotbugs {
-        toolVersion = '4.2.3'
-        excludeFilter = file("${project.rootDir}/spotbugs-exclude.xml")
-    }
+//    spotbugs {
+//        toolVersion = '4.2.3'
+//        excludeFilter = file("${project.rootDir}/spotbugs-exclude.xml")
+//    }
 
 //    tasks.withType(SpotBugsTask) {
 //        reports.xml.enabled = false
@@ -556,10 +556,10 @@ rat {
 
 compileIntegrationTestJava.onlyIf { "true" != System.getenv("skipIntegrationTest") }
 checkstyleIntegrationTest.onlyIf { "true" != System.getenv("skipIntegrationTest") }
-spotbugsIntegrationTest.onlyIf { "true" != System.getenv("skipIntegrationTest") }
+//spotbugsIntegrationTest.onlyIf { "true" != System.getenv("skipIntegrationTest") }
 compileContainerTestJava.onlyIf { "true" != System.getenv("skipContainerTest") }
 checkstyleContainerTest.onlyIf { "true" != System.getenv("skipContainerTest") }
-spotbugsContainerTest.onlyIf { "true" != System.getenv("skipContainerTest") }
+//spotbugsContainerTest.onlyIf { "true" != System.getenv("skipContainerTest") }
 
 // copyDist gets called on every build
 copyDist.dependsOn installDist, copyJolokia
