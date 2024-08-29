@@ -33,7 +33,7 @@ import java.nio.file.Paths
 plugins {
     id('java-library')
     id('maven-publish')
-    id('com.github.johnrengelman.shadow') version '8.1.1'
+    id('com.gradleup.shadow') version '8.3.0'
 }
 
 group 'org.apache.cassandra.sidecar'
@@ -81,7 +81,7 @@ shadowJar {
     relocate 'io.vertx', 'o.a.c.sidecar.client.shaded.io.vertx'
     relocate 'META-INF/native/libnetty', 'META-INF/native/libo_a_c_sidecar_client_shaded_netty'
     relocate 'META-INF/versions/11/io/vertx', 'META-INF/versions/11/o/a/c/sidecar/client/shaded/io/vertx'
-    transform(NettyResourceTransformer.class)
+//    transform(NettyResourceTransformer.class)
     mergeServiceFiles()
 
     dependencies {
