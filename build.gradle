@@ -266,10 +266,11 @@ ospackage {
     // ospackage puts packages into /opt/[package] by default
     // which is _technically_ the right spot for packages
     link("/usr/local/bin/cassandra-sidecar", "/opt/cassandra-sidecar/bin/cassandra-sidecar")
-    license "Apache License 2.0"
-    description "Sidecar Management Tool for Apache Cassandra"
+    license = "Apache License 2.0"
+    summary = "Sidecar Management Tool for Apache Cassandra"
+    description = "Sidecar Management Tool for Apache Cassandra"
     os = LINUX
-    user "root"
+    user = "root"
 }
 
 buildRpm {
@@ -322,6 +323,8 @@ rat {
     reportDir.set(file("build/reports/rat"))
 }
 
+distZip.dependsOn copyJolokia
+distTar.dependsOn copyJolokia
 installDist.dependsOn copyJolokia
 check.dependsOn codeCheckTasks
 if (JavaVersion.current().isJava11Compatible()) {
@@ -331,4 +334,9 @@ run.dependsOn build
 
 tasks.named('rat').configure {
     dependsOn(buildIgnoreRatList)
+}
+
+tasks.named('distTar').configure {
+    compression = Compression.GZIP
+    archiveExtension.set("tar.gz")
 }
