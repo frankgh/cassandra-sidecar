@@ -43,10 +43,6 @@ commands:
           apt-get download ant ant-optional
           sudo dpkg --force-all -i ant*.deb
           rm ant*.deb
-      # We need aliases for localhost2,localhost3, ..., localhost20 in hosts
-      - run: |
-          sudo bash -c 'for i in {2..20}; do echo 127.0.0.${i} localhost${i} >> /etc/hosts; done'
-          cat /etc/hosts
 
 jobs:
   # Runs java 8 tests on a docker image
