@@ -21,7 +21,7 @@
 #
 cassandra_instances:
   - id: 1
-    host: localhost1
+    host: localhost
     port: 9042
 
     # The instance's storage directory as defined per the cassandra.storagedir property
@@ -30,7 +30,7 @@ cassandra_instances:
     # commitlog dir, cdc dir, hints dir and saved caches dir. If data_dirs, commitlog_dir,
     # cdc_dir, hints_dir and saved_caches_dir are configured explicitly, then they will be used.
     # Otherwise, default paths based on storage directory will be used.
-    storage_dir: /var/lib/cassandra
+    storage_dir: $baseDir/var/lib/cassandra
 
     # List of directories where Cassandra stores data on disk. If not set, the default directory
     # is <storage_dir>/data
@@ -67,8 +67,8 @@ cassandra_instances:
 #    jmx_role:
 #    jmx_role_password:
     lifecycle_options:
-      cassandra_conf_dir: /etc/cassandra
-#     cassandra_log_dir: /var/log/cassandra
+      cassandra_conf_dir: $baseDir/etc/cassandra
+      cassandra_log_dir: $baseDir/var/log/cassandra
 
 sidecar:
   host: 0.0.0.0
@@ -110,7 +110,6 @@ sidecar:
       maximum_size: 10000
   cdc:
     segment_hardlink_cache_expiry: 5m # 5 minutes
-    table_schema_refresh_time: 60s    # Interval time between table schema refresh for CDC
   worker_pools:
     service:
       name: "sidecar-worker-pool"
@@ -261,25 +260,6 @@ access_control:
         # trying to connect.
         client_id: recognized_client_id
         config_discover_interval: 1h
-        #
-        # Authentication type dictates whether to use the Oauth flow or a stateless JWT authenticator
-        # If not provided, default is oauth. Valid values are oauth or stateless
-        # jwt_auth_type: oauth
-        #
-        # Optional configurations for connecting to JWT PEM provider
-        #
-        # keystore_path defines the path to a keystore which can be used to provide SSL certificates to
-        # a JWT pem provider. If specified, a password must be provided.
-        # keystore_path: /path/to/keystore
-        # keystore_password: changeme
-        #
-        # truststore_path defines the path to a truststore that contains the CA used to validate SSL certs used
-        # by downstream PEM provider services. If specified, a password must be provided.
-        # truststore_path: /path/to/truststore
-        # truststore_password: changeme
-        #
-        # Optional JWT which can be used to authenticate to a downstream PEM provider if required.
-        # pem_provider_jwt: changeme
   authorizer:
     # Authorization backend, implementing io.vertx.ext.auth.authorization.AuthorizationProvider; used to
     # provide permissions a user holds.
@@ -295,10 +275,7 @@ access_control:
 #    - spiffe://authorized/admin/identities
   permission_cache:
     enabled: true
-    # refresh_after_write does async cache refreshes. expire_after_access removes the cache entry on expiry. Prefer
-    # setting refresh_after_write over expire_after_access for AuthCaches
-    # expire_after_access: 5m
-    refresh_after_write: 5m
+    expire_after_access: 5m
     maximum_size: 1000
     warmup_retries: 5
     warmup_retry_interval: 2s
@@ -378,23 +355,6 @@ metrics:
 #      value: "vertx.eventbus.*"              # exclude all metrics starts with vertx.eventbus
 
 cassandra_input_validation:
-  validator:
-    # Implementation to use for the validation of Casandra inputs. Out of the box, Cassandra Sidecar provides
-    # org.apache.cassandra.sidecar.utils.{RegexBasedCassandraInputValidator, FastCassandraInputValidator}.
-    #
-    # - RegexBasedCassandraInputValidator default implementation the uses regular expressions to perform validations
-    # - FastCassandraInputValidator optimized implementation that does not use regular expressions. This implementation
-    #                               ignores the regular expressions configured in the cassandra_input_validation
-    #                               configuration.
-  - class_name: org.apache.cassandra.sidecar.utils.RegexBasedCassandraInputValidator
-    # Configuration parameters that are only applicable to the FastCassandraInputValidator implementation
-    #parameters:
-    #  # Comma-separated list of terminations allowed for the component name. By default, allowed component
-    #  # names can only end in .db, .cql, .json, .crc32, or TOC.txt
-    #  valid_terminations: ".db,.cql,.json,.crc32,TOC.txt"
-    #  # Comma-separated list of terminations allowed for the restricted component name. By default, allowed
-    #  # restricted component names con only end in .db or TOC.txt
-    #  valid_restricted_terminations: ".db,TOC.txt"
   forbidden_keyspaces:
     - system_schema
     - system_traces
@@ -406,8 +366,8 @@ cassandra_input_validation:
     - sidecar_internal
   allowed_chars_for_directory: "[a-zA-Z][a-zA-Z0-9_]{0,47}"
   allowed_chars_for_quoted_name: "[a-zA-Z_0-9]{1,48}"
-  allowed_chars_for_component_name: "[a-zA-Z0-9_-]+(\\.db|\\.cql|\\.json|\\.crc32|TOC\\.txt)"
-  allowed_chars_for_restricted_component_name: "[a-zA-Z0-9_-]+(\\.db|TOC\\.txt)"
+  allowed_chars_for_component_name: "[a-zA-Z0-9_-]+(.db|.cql|.json|.crc32|TOC.txt)"
+  allowed_chars_for_restricted_component_name: "[a-zA-Z0-9_-]+(.db|TOC.txt)"
 
 blob_restore:
   job_discovery_active_loop_delay: 5m
@@ -456,17 +416,17 @@ live_migration:
   dirs_to_exclude:
     - glob:${DATA_FILE_DIR}/*/*/snapshots # Excludes snapshot directories in data folder to copy to destination
   migration_map:                          # Map of source and destination Cassandra instances
-#    localhost1: localhost4               # This entry says that localhost1 will be migrated to localhost4
+#    localhost: localhost4               # This entry says that localhost will be migrated to localhost4
   max_concurrent_downloads: 20            # Maximum number of concurrent downloads allowed
 
 # Configuration to allow sidecar start and stop Cassandra instances via the lifecycle API (disabled by default)
 lifecycle:
-  enabled: false
+  enabled: true
   provider:
     class_name: org.apache.cassandra.sidecar.lifecycle.ProcessLifecycleProvider
     parameters:
-      state_dir: /var/lib/cassandra-sidecar/lifecycle # The directory where the process state is stored
-      cassandra_home: /opt/cassandra # The default Cassandra installation directory
-#     cassandra.ring_delay_ms: 30000   # It is possible to override Cassandra JVM options via the "cassandra." prefix
-#     env.MAX_HEAP_SIZE: 8G # It is possible to set environment variables used to start Cassandra via the "env" prefix
-#     env.HEAP_NEWSIZE: 8G
+      state_dir: $baseDir/var/lib/cassandra-sidecar/lifecycle # The directory where the process state is stored
+      cassandra_home: $cassandraHome # The default Cassandra installation directory
+      cassandra.ring_delay_ms: 5000   # It is possible to override Cassandra JVM options via the "cassandra." prefix
+      env.MAX_HEAP_SIZE: 4G # It is possible to set environment variables used to start Cassandra via the "env" prefix
+      env.HEAP_NEWSIZE: 4G
