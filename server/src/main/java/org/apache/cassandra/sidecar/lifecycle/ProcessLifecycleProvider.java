@@ -18,7 +18,9 @@
 
 package org.apache.cassandra.sidecar.lifecycle;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -28,12 +30,11 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
 import org.apache.cassandra.sidecar.exceptions.ConfigurationException;
 import org.jetbrains.annotations.VisibleForTesting;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Manage the lifecycle of Cassandra instances running on local processes
@@ -153,6 +154,7 @@ public class ProcessLifecycleProvider implements LifecycleProvider
                 CompletableFuture<ProcessHandle> terminationFuture = processHandle.get().onExit();
                 processHandle.get().destroy();  // blocking call, make async?
                 terminationFuture.get(CASSANDRA_PROCESS_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                Files.deleteIfExists(Path.of(pidFileLocation));
             }
             else
             {
@@ -183,28 +185,60 @@ public class ProcessLifecycleProvider implements LifecycleProvider
                                         .build();
     }
 
+    /**
+     * Checks whether a Cassandra instance is currently running as a local process
+     * and automatically cleans up stale PID files.
+     *
+     * Performs four validation steps:
+     * 1. Verifies the PID file exists and is readable. Returns false if not found.
+     * 2. Reads the PID and checks if the process is alive. Returns false and deletes the
+     *    PID file if the process no longer exists or is not alive.
+     * 3. Verifies the process is a Cassandra instance by checking for
+     *    org.apache.cassandra.service.CassandraDaemon in the command line. Returns true if
+     *    the command line contains the Cassandra daemon class or cannot be determined.
+     * 4. If the process is running but is not a Cassandra process, returns false and deletes
+     *    the stale PID file.
+     *
+     * @param instance the instance metadata containing host information
+     * @return true if the instance is running as a Cassandra process, false otherwise
+     */
     private boolean isCassandraProcessRunning(InstanceMetadata instance)
     {
         Path pidFilePath = Path.of(getPidFileLocation(instance.host()));
-        if (!Files.isRegularFile(pidFilePath) || !Files.isReadable(pidFilePath))
-        {
-            LOG.debug("PID file does not exist or is not readable for instance {} at path {}", instance.host(), pidFilePath);
-            return false;
-        }
-
         try
         {
+            // Case 1: PID file does not exist or is not readable
+            if (!Files.isRegularFile(pidFilePath) || !Files.isReadable(pidFilePath))
+            {
+                LOG.debug("PID file does not exist or is not readable for instance {} at path {}", instance.host(), pidFilePath);
+                return false;
+            }
+
             Long pid = readPidFromFile(pidFilePath);
-            if (ProcessHandle.of(pid).isPresent())
+            Optional<ProcessHandle> processHandle = ProcessHandle.of(pid);
+
+            // Case 2: No process with such PID or process is not alive
+            if (processHandle.isEmpty() || !processHandle.get().isAlive())
+            {
+                LOG.debug("No running process found with PID {} for instance {}", pid, instance.host());
+                deletePidFile(instance, pidFilePath);
+                return false;
+            }
+            
+            // Case 3: Process with such PID is running - check if it's a Cassandra process
+            // If we can't determine the command line, we assume it's Cassandra
+            Optional<String> cmdLine = getCommandLinePlatformIndependent(processHandle.get());
+            if (cmdLine.isEmpty() || cmdLine.get().contains("org.apache.cassandra.service.CassandraDaemon"))
             {
                 LOG.debug("Cassandra instance {} is running with PID {}", instance.host(), pid);
                 return true;
             }
-            else
-            {
-                LOG.warn("PID file exists for instance {}, but process with PID {} is not running", instance.host(), pid);
-                return false;
-            }
+            
+            // Case 4: Process with such PID is running but it's not a Cassandra process
+            LOG.debug("Process with PID {} for instance {} is not a Cassandra process (command line: {}).",
+                        pid, instance.host(), cmdLine);
+            deletePidFile(instance, pidFilePath);
+            return false;
         }
         catch (Exception e)
         {
@@ -213,6 +247,48 @@ public class ProcessLifecycleProvider implements LifecycleProvider
         }
     }
 
+    protected static void deletePidFile(InstanceMetadata instance, Path pidFilePath) {
+        try
+        {
+            LOG.info("Deleting stale PID file {} for instance {}", pidFilePath, instance.host());
+            Files.delete(pidFilePath);
+        } 
+        catch (Exception e)
+        {
+            LOG.warn("Failed to delete stale PID file {} for instance {}: {}", pidFilePath, instance.host(), e.getMessage());
+        }
+    }
+
+    /*
+     * Due to JDK-8345117 java can sometimes truncate the command line returned by ProcessHandle.info().commandLine()
+     * on some platforms (ie. Linux). To work around this, we use the 'ps' command to get the full command line.
+     * This method should be platform-independent as it relies on the 'ps' command which is available on most Unix-like systems.
+     * For non-Unix systems, we fall back to the default implementation.
+    */
+    protected static Optional<String> getCommandLinePlatformIndependent(ProcessHandle processHandle) {
+        long pid = processHandle.pid();
+        try {
+            ProcessBuilder pb = new ProcessBuilder("ps", "-p", String.valueOf(pid), "-o", "args=");
+            Process proc = pb.start();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(proc.getInputStream()))) {
+                String line = reader.readLine();
+                proc.waitFor(5, TimeUnit.SECONDS);
+                if (line != null && !line.isEmpty())
+                {
+                    return Optional.of(line.trim());
+                }
+            }
+        }
+        catch (Exception e) 
+        {
+            LOG.warn("Failed to get command line via ps for PID {}", pid, e);
+        }
+        // Fallback to default implementation
+        return processHandle.info().commandLine();
+    }
+
+    @VisibleForTesting
     public static Long readPidFromFile(Path pidFilePath)
     {
         try

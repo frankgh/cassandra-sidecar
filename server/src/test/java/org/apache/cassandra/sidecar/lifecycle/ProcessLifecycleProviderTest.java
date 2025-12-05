@@ -18,7 +18,6 @@
 
 package org.apache.cassandra.sidecar.lifecycle;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -95,13 +94,12 @@ public class ProcessLifecycleProviderTest
         {
             // Mock ProcessHandle.of to simulate process running state
             ProcessHandle mockHandle = mock(ProcessHandle.class);
-            when(mockHandle.onExit()).then(i -> CompletableFuture.supplyAsync(() -> {
-                String pidFileLocation = getPidFileLocation(lifecycleStateDir.toString(), "localhost");
-                // delete the pid file to simulate a stopped process
-                File file = Path.of(pidFileLocation).toFile();
-                file.delete();
-                return null;
-            }));
+            ProcessHandle.Info mockInfo = mock(ProcessHandle.Info.class);
+            when(mockHandle.isAlive()).thenReturn(true);
+            when(mockHandle.info()).thenReturn(mockInfo);
+            when(mockInfo.commandLine()).thenReturn(Optional.of("java -cp /path/to/cassandra org.apache.cassandra.service.CassandraDaemon"));
+            when(mockHandle.onExit()).thenReturn(CompletableFuture.completedFuture(null));
+            when(mockHandle.pid()).thenReturn(12345L);
             Optional<ProcessHandle> presentHandle = Optional.of(mockHandle);
             processHandleMock.when(() -> ProcessHandle.of(12345L))
                              .thenReturn(presentHandle);
@@ -316,5 +314,277 @@ public class ProcessLifecycleProviderTest
         assertThat(env.get("CASSANDRA_CONF")).isEqualTo(tempConfDir.toString());
         assertThat(env.get("JVM_OPTS")).isEqualTo("-Xms1G -Xmx2G");
         assertThat(env.get("CUSTOM_VAR")).isEqualTo("custom_value");
+    }
+
+    @Test
+    void testIsCassandraProcessRunningRemovesStalePidFile() throws IOException
+    {
+        try (MockedStatic<ProcessHandle> processHandleMock = mockStatic(ProcessHandle.class))
+        {
+            // Create provider
+            Map<String, String> params = Map.of(
+            ProcessLifecycleProvider.OPT_STATE_DIR, lifecycleStateDir.toString(),
+            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, "/default/cassandra/home"
+            );
+            ProcessLifecycleProvider provider = new ProcessLifecycleProvider(params);
+
+            // Create mock instance metadata
+            InstanceMetadata instance = mock(InstanceMetadata.class);
+            when(instance.host()).thenReturn("localhost");
+            when(instance.storageDir()).thenReturn("/storage/dir");
+            when(instance.lifecycleOptions()).thenReturn(Map.of());
+
+            // Create a PID file with a stale PID (process that doesn't exist)
+            String pidFileLocation = getPidFileLocation(lifecycleStateDir.toString(), "localhost");
+            Path pidFilePath = Path.of(pidFileLocation);
+            Files.writeString(pidFilePath, "99999");
+
+            // Mock ProcessHandle.of to return empty (process doesn't exist)
+            processHandleMock.when(() -> ProcessHandle.of(99999L))
+                             .thenReturn(Optional.empty());
+
+            // Verify PID file exists before the check
+            assertThat(pidFilePath).exists();
+
+            // Call isRunning - should return false and remove the stale PID file
+            boolean isRunning = provider.isRunning(instance);
+
+            // Verify process is not running
+            assertThat(isRunning).isFalse();
+
+            // Verify the stale PID file was removed
+            assertThat(pidFilePath).doesNotExist();
+        }
+    }
+
+    @Test
+    void testIsCassandraProcessRunningRemovesStalePidFileWhenNotCassandra() throws IOException
+    {
+        try (MockedStatic<ProcessHandle> processHandleMock = mockStatic(ProcessHandle.class))
+        {
+            // Create provider
+            Map<String, String> params = Map.of(
+            ProcessLifecycleProvider.OPT_STATE_DIR, lifecycleStateDir.toString(),
+            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, "/default/cassandra/home"
+            );
+            ProcessLifecycleProvider provider = new ProcessLifecycleProvider(params);
+
+            // Create mock instance metadata
+            InstanceMetadata instance = mock(InstanceMetadata.class);
+            when(instance.host()).thenReturn("localhost");
+            when(instance.storageDir()).thenReturn("/storage/dir");
+            when(instance.lifecycleOptions()).thenReturn(Map.of());
+
+            // Create a PID file with a PID
+            String pidFileLocation = getPidFileLocation(lifecycleStateDir.toString(), "localhost");
+            Path pidFilePath = Path.of(pidFileLocation);
+            Files.writeString(pidFilePath, "55555");
+
+            // Mock ProcessHandle that exists and is alive but is not a Cassandra process
+            ProcessHandle mockHandle = mock(ProcessHandle.class);
+            ProcessHandle.Info mockInfo = mock(ProcessHandle.Info.class);
+            when(mockHandle.isAlive()).thenReturn(true);
+            when(mockHandle.info()).thenReturn(mockInfo);
+            when(mockInfo.commandLine()).thenReturn(Optional.of("/usr/bin/someothercommand"));
+            when(mockHandle.pid()).thenReturn(55555L);
+
+            processHandleMock.when(() -> ProcessHandle.of(55555L))
+                             .thenReturn(Optional.of(mockHandle));
+
+            // Verify PID file exists before the check
+            assertThat(pidFilePath).exists();
+
+            // Call isRunning - should return false and remove the stale PID file
+            boolean isRunning = provider.isRunning(instance);
+
+            // Verify process is not running
+            assertThat(isRunning).isFalse();
+
+            // Verify the stale PID file was removed
+            assertThat(pidFilePath).doesNotExist();
+        }
+    }
+
+    @Test
+    void testIsCassandraProcessRunningDoesNotRemovePidFileWhenCassandraIsRunning() throws IOException
+    {
+        try (MockedStatic<ProcessHandle> processHandleMock = mockStatic(ProcessHandle.class))
+        {
+            // Create provider
+            Map<String, String> params = Map.of(
+            ProcessLifecycleProvider.OPT_STATE_DIR, lifecycleStateDir.toString(),
+            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, "/default/cassandra/home"
+            );
+            ProcessLifecycleProvider provider = new ProcessLifecycleProvider(params);
+
+            // Create mock instance metadata
+            InstanceMetadata instance = mock(InstanceMetadata.class);
+            when(instance.host()).thenReturn("localhost");
+            when(instance.storageDir()).thenReturn("/storage/dir");
+            when(instance.lifecycleOptions()).thenReturn(Map.of());
+
+            // Create a PID file with a valid Cassandra process PID
+            String pidFileLocation = getPidFileLocation(lifecycleStateDir.toString(), "localhost");
+            Path pidFilePath = Path.of(pidFileLocation);
+            Files.writeString(pidFilePath, "77777");
+
+            // Mock ProcessHandle that exists and is a Cassandra process
+            ProcessHandle mockHandle = mock(ProcessHandle.class);
+            ProcessHandle.Info mockInfo = mock(ProcessHandle.Info.class);
+            when(mockHandle.isAlive()).thenReturn(true);
+            when(mockHandle.info()).thenReturn(mockInfo);
+            when(mockInfo.commandLine()).thenReturn(Optional.of("java -cp /path/to/cassandra org.apache.cassandra.service.CassandraDaemon"));
+            when(mockHandle.pid()).thenReturn(77777L);
+
+            processHandleMock.when(() -> ProcessHandle.of(77777L))
+                             .thenReturn(Optional.of(mockHandle));
+
+            // Verify PID file exists before the check
+            assertThat(pidFilePath).exists();
+
+            // Call isRunning
+            boolean isRunning = provider.isRunning(instance);
+
+            // Verify process is running
+            assertThat(isRunning).isTrue();
+
+            // Verify the PID file was NOT removed since process is running
+            assertThat(pidFilePath).exists();
+            assertThat(Files.readString(pidFilePath).trim()).isEqualTo("77777");
+        }
+    }
+
+    @Test
+    void testGetCommandLinePlatformIndependentReturnsFallbackWhenPsFails()
+    {
+        // Mock ProcessHandle
+        ProcessHandle mockHandle = mock(ProcessHandle.class);
+        ProcessHandle.Info mockInfo = mock(ProcessHandle.Info.class);
+        when(mockHandle.info()).thenReturn(mockInfo);
+        String expectedCommandLine = "java -cp /path/to/cassandra org.apache.cassandra.service.CassandraDaemon";
+        when(mockInfo.commandLine()).thenReturn(Optional.of(expectedCommandLine));
+        when(mockHandle.pid()).thenReturn(99999L);
+
+        // Since ps will fail (PID doesn't exist), we should get the fallback command line
+        Optional<String> result = ProcessLifecycleProvider.getCommandLinePlatformIndependent(mockHandle);
+
+        // Verify that we get the fallback result (since ps will return empty for non-existent PID)
+        assertThat(result).isPresent();
+        assertThat(result.get()).isEqualTo(expectedCommandLine);
+    }
+
+    @Test
+    void testReadPidFromFile() throws IOException
+    {
+        // Create a PID file with a valid PID
+        Path pidFilePath = lifecycleStateDir.resolve("test.pid");
+        Files.writeString(pidFilePath, "12345");
+
+        // Read the PID from the file
+        Long pid = ProcessLifecycleProvider.readPidFromFile(pidFilePath);
+
+        // Verify the PID is read correctly
+        assertThat(pid).isEqualTo(12345L);
+    }
+
+    @Test
+    void testReadPidFromFileWithWhitespace() throws IOException
+    {
+        // Create a PID file with whitespace around the PID
+        Path pidFilePath = lifecycleStateDir.resolve("test.pid");
+        Files.writeString(pidFilePath, "  54321  \n");
+
+        // Read the PID from the file
+        Long pid = ProcessLifecycleProvider.readPidFromFile(pidFilePath);
+
+        // Verify the PID is read correctly and whitespace is trimmed
+        assertThat(pid).isEqualTo(54321L);
+    }
+
+    @Test
+    void testReadPidFromFileThrowsExceptionForInvalidPid()
+    {
+        // Create a PID file with invalid content
+        Path pidFilePath = lifecycleStateDir.resolve("test.pid");
+        assertThat(pidFilePath).doesNotExist();
+
+        try
+        {
+            Files.writeString(pidFilePath, "invalid_pid");
+            ProcessLifecycleProvider.readPidFromFile(pidFilePath);
+            
+            // Should not reach here
+            assertThat(false).as("Expected RuntimeException to be thrown").isTrue();
+        }
+        catch (RuntimeException e)
+        {
+            assertThat(e.getMessage()).contains("Failed to read PID from file");
+            assertThat(e.getCause()).isInstanceOf(NumberFormatException.class);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    void testReadPidFromFileThrowsExceptionForMissingFile()
+    {
+        // Try to read a PID file that doesn't exist
+        Path pidFilePath = lifecycleStateDir.resolve("nonexistent.pid");
+
+        try
+        {
+            ProcessLifecycleProvider.readPidFromFile(pidFilePath);
+            
+            // Should not reach here
+            assertThat(false).as("Expected RuntimeException to be thrown").isTrue();
+        }
+        catch (RuntimeException e)
+        {
+            assertThat(e.getMessage()).contains("Failed to read PID from file");
+            assertThat(e.getCause()).isInstanceOf(IOException.class);
+        }
+    }
+
+    @Test
+    void testDeletePidFile() throws IOException
+    {
+        // Create a mock instance
+        InstanceMetadata instance = mock(InstanceMetadata.class);
+        when(instance.host()).thenReturn("testhost");
+
+        // Create a PID file
+        Path pidFilePath = lifecycleStateDir.resolve("cassandra-testhost.pid");
+        Files.writeString(pidFilePath, "99999");
+
+        // Verify the file exists
+        assertThat(pidFilePath).exists();
+
+        // Delete the PID file
+        ProcessLifecycleProvider.deletePidFile(instance, pidFilePath);
+
+        // Verify the file was deleted
+        assertThat(pidFilePath).doesNotExist();
+    }
+
+    @Test
+    void testDeletePidFileWhenFileDoesNotExist()
+    {
+        // Create a mock instance
+        InstanceMetadata instance = mock(InstanceMetadata.class);
+        when(instance.host()).thenReturn("testhost");
+
+        // Try to delete a PID file that doesn't exist
+        Path pidFilePath = lifecycleStateDir.resolve("nonexistent-cassandra-testhost.pid");
+
+        // Verify the file doesn't exist
+        assertThat(pidFilePath).doesNotExist();
+
+        // Should not throw an exception when trying to delete a non-existent file
+        ProcessLifecycleProvider.deletePidFile(instance, pidFilePath);
+
+        // Verify the file still doesn't exist
+        assertThat(pidFilePath).doesNotExist();
     }
 }
