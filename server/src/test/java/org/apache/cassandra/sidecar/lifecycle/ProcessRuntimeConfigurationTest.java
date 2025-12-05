@@ -232,8 +232,8 @@ class ProcessRuntimeConfigurationTest
         assertThat(pb.directory()).isEqualTo(cassandraHome.toFile());
 
         // Verify redirects are configured (files don't need to exist for ProcessBuilder creation)
-        assertThat(pb.redirectOutput().type()).isEqualTo(ProcessBuilder.Redirect.Type.APPEND);
-        assertThat(pb.redirectError().type()).isEqualTo(ProcessBuilder.Redirect.Type.APPEND);
+        assertThat(pb.redirectOutput().type()).isEqualTo(ProcessBuilder.Redirect.Type.WRITE);
+        assertThat(pb.redirectError().type()).isEqualTo(ProcessBuilder.Redirect.Type.WRITE);
     }
 
     @Test
@@ -267,8 +267,8 @@ class ProcessRuntimeConfigurationTest
         assertThat(pb.directory()).isEqualTo(cassandraHome.toFile());
 
         // Verify redirects are configured
-        assertThat(pb.redirectOutput().type()).isEqualTo(ProcessBuilder.Redirect.Type.APPEND);
-        assertThat(pb.redirectError().type()).isEqualTo(ProcessBuilder.Redirect.Type.APPEND);
+        assertThat(pb.redirectOutput().type()).isEqualTo(ProcessBuilder.Redirect.Type.WRITE);
+        assertThat(pb.redirectError().type()).isEqualTo(ProcessBuilder.Redirect.Type.WRITE);
     }
 
     @Test

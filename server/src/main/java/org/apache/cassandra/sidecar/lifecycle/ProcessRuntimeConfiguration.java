@@ -214,8 +214,8 @@ public class ProcessRuntimeConfiguration
         }
 
         // Redirect output to logs
-        processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(new File(stdoutFileLocation)));
-        processBuilder.redirectError(ProcessBuilder.Redirect.appendTo(new File(stderrFileLocation)));
+        processBuilder.redirectOutput(ProcessBuilder.Redirect.to(new File(stdoutFileLocation)));
+        processBuilder.redirectError(ProcessBuilder.Redirect.to(new File(stderrFileLocation)));
 
         // Set working directory
         processBuilder.directory(cassandraHome().toFile());
