@@ -51,4 +51,4 @@ fi
 echo "Creating configuration"
 cp -r ${CASSANDRA_HOME}/conf/* ${CASSANDRA_CONF}
 sed "s#\$cassandraHome#${CASSANDRA_HOME}#g" ${SIDECAR_YAML_TEMPLATE} > ${SIDECAR_YAML}
-sed -i "s#\$baseDir#${NODE_DIR}#g" ${SIDECAR_YAML}
+sed -i '' "s#\$baseDir#${NODE_DIR}#g" ${SIDECAR_YAML}
