@@ -32,7 +32,7 @@ apply from: "${project.rootDir}/gradle/common/java11Options.gradle"
 def getCassandraTarballLocation() {
     def tarballsDirFile = file(tarballsDir)
     if (tarballsDirFile.exists() && tarballsDirFile.isDirectory()) {
-        def matchingFiles = fileTree(tarballsDirFile).files.findAll {it.name ==~ /^apache-cassandra-${tarballVersion}\.?\d*-SNAPSHOT-bin\.tar.gz$/ }
+        def matchingFiles = fileTree(tarballsDirFile).files.findAll {it.name ==~ /^apache-cassandra-${tarballVersion}\.?\d*(-SNAPSHOT){0,1}-bin\.tar.gz$/ }
         if (matchingFiles.size() > 0) {
             def tarballToTest = matchingFiles.first()
             println("Testing with tarball ${tarballToTest}")
