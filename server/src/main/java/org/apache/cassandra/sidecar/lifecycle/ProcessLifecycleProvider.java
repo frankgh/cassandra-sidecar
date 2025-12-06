@@ -30,11 +30,12 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
 import org.apache.cassandra.sidecar.exceptions.ConfigurationException;
 import org.jetbrains.annotations.VisibleForTesting;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Manage the lifecycle of Cassandra instances running on local processes
@@ -217,7 +218,7 @@ public class ProcessLifecycleProvider implements LifecycleProvider
             Long pid = readPidFromFile(pidFilePath);
             Optional<ProcessHandle> processHandle = ProcessHandle.of(pid);
 
-            // Case 2: No process with such PID or process is not alive
+            // Case 2: No process running with such PID or process is not alive
             if (processHandle.isEmpty() || !processHandle.get().isAlive())
             {
                 LOG.debug("No running process found with PID {} for instance {}", pid, instance.host());
@@ -247,7 +248,8 @@ public class ProcessLifecycleProvider implements LifecycleProvider
         }
     }
 
-    protected static void deletePidFile(InstanceMetadata instance, Path pidFilePath) {
+    protected static void deletePidFile(InstanceMetadata instance, Path pidFilePath)
+    {
         try
         {
             LOG.info("Deleting stale PID file {} for instance {}", pidFilePath, instance.host());
@@ -265,13 +267,16 @@ public class ProcessLifecycleProvider implements LifecycleProvider
      * This method should be platform-independent as it relies on the 'ps' command which is available on most Unix-like systems.
      * For non-Unix systems, we fall back to the default implementation.
     */
-    protected static Optional<String> getCommandLinePlatformIndependent(ProcessHandle processHandle) {
+    protected static Optional<String> getCommandLinePlatformIndependent(ProcessHandle processHandle)
+    {
         long pid = processHandle.pid();
-        try {
+        try
+        {
             ProcessBuilder pb = new ProcessBuilder("ps", "-p", String.valueOf(pid), "-o", "args=");
             Process proc = pb.start();
             try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(proc.getInputStream()))) {
+                    new InputStreamReader(proc.getInputStream())))
+            {
                 String line = reader.readLine();
                 proc.waitFor(5, TimeUnit.SECONDS);
                 if (line != null && !line.isEmpty())
