@@ -159,7 +159,7 @@ public class ProcessLifecycleProvider implements LifecycleProvider
             }
             else
             {
-                LOG.warn("No process running for Cassandra instance {} with PID {}.", casCfg.instanceName, pid);
+                LOG.warn("No process running for Cassandra instance {} with PID {}.", casCfg.instanceName(), pid);
             }
         }
         catch (Throwable t)
