@@ -72,6 +72,11 @@ public class ProcessLifecycleProvider implements LifecycleProvider
         }
         this.lifecycleDir = params.get(OPT_STATE_DIR);
         this.defaultCassandraHome = params.get(OPT_CASSANDRA_HOME);
+        validateConfiguration();
+    }
+
+    private void validateConfiguration()
+    {
         if (lifecycleDir == null || lifecycleDir.isEmpty())
         {
             throw new ConfigurationException("Configuration property '" + OPT_STATE_DIR + "' must be set for ProcessLifecycleProvider");
@@ -79,6 +84,26 @@ public class ProcessLifecycleProvider implements LifecycleProvider
         if (defaultCassandraHome == null || defaultCassandraHome.isEmpty())
         {
             throw new ConfigurationException("Configuration property '" + OPT_CASSANDRA_HOME + "' must be set for ProcessLifecycleProvider");
+        }
+
+        Path stateDir = Path.of(lifecycleDir);
+        if (!Files.isDirectory(stateDir))
+        {
+            throw new ConfigurationException("State directory '" + lifecycleDir + "' does not exist or is not a directory");
+        }
+        if (!Files.isWritable(stateDir))
+        {
+            throw new ConfigurationException("State directory '" + lifecycleDir + "' is not writable");
+        }
+
+        Path cassandraHomePath = Path.of(defaultCassandraHome);
+        if (!Files.isDirectory(cassandraHomePath))
+        {
+            throw new ConfigurationException("Cassandra home '" + defaultCassandraHome + "' does not exist or is not a directory");
+        }
+        if (!Files.isReadable(cassandraHomePath))
+        {
+            throw new ConfigurationException("Cassandra home '" + defaultCassandraHome + "' is not readable");
         }
     }
 

@@ -27,10 +27,12 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
+import org.apache.cassandra.sidecar.exceptions.ConfigurationException;
 import org.mockito.MockedStatic;
 
 import static org.apache.cassandra.sidecar.lifecycle.ProcessLifecycleProvider.getPidFileLocation;
@@ -51,6 +53,15 @@ public class ProcessLifecycleProviderTest
 {
     @TempDir
     Path lifecycleStateDir;
+
+    Path defaultCassandraHome;
+
+    @BeforeEach
+    void setUp() throws IOException
+    {
+        defaultCassandraHome = lifecycleStateDir.resolve("cassandra-home");
+        Files.createDirectories(defaultCassandraHome);
+    }
 
     /**
      * A fake implementation of ProcessLifecycleProvider for testing purposes.
@@ -111,7 +122,7 @@ public class ProcessLifecycleProviderTest
             // Create provider with temporary lifecycle state directory
             Map<String, String> params = Map.of(
             ProcessLifecycleProvider.OPT_STATE_DIR, lifecycleStateDir.toString(),
-            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, "/default/cassandra/home"
+            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, defaultCassandraHome.toString()
             );
             FakeProcessLifecycleProvider provider = new FakeProcessLifecycleProvider(params);
 
@@ -148,7 +159,7 @@ public class ProcessLifecycleProviderTest
     {
         Map<String, String> params = Map.of(
         ProcessLifecycleProvider.OPT_STATE_DIR, lifecycleStateDir.toString(),
-        ProcessLifecycleProvider.OPT_CASSANDRA_HOME, "/default/cassandra/home"
+        ProcessLifecycleProvider.OPT_CASSANDRA_HOME, defaultCassandraHome.toString()
         );
 
         ProcessLifecycleProvider provider = new ProcessLifecycleProvider(params);
@@ -180,7 +191,7 @@ public class ProcessLifecycleProviderTest
     {
         Map<String, String> params = Map.of(
         ProcessLifecycleProvider.OPT_STATE_DIR, lifecycleStateDir.toString(),
-        ProcessLifecycleProvider.OPT_CASSANDRA_HOME, "/default/cassandra/home"
+        ProcessLifecycleProvider.OPT_CASSANDRA_HOME, defaultCassandraHome.toString()
         );
 
         ProcessLifecycleProvider provider = new ProcessLifecycleProvider(params);
@@ -200,7 +211,7 @@ public class ProcessLifecycleProviderTest
         ProcessRuntimeConfiguration config = provider.getRuntimeConfiguration(instance);
 
         // Verify the configuration uses default Cassandra home
-        assertThat(config.cassandraHome()).isEqualTo(Path.of("/default/cassandra/home"));
+        assertThat(config.cassandraHome()).isEqualTo(defaultCassandraHome);
     }
 
     @Test
@@ -328,7 +339,7 @@ public class ProcessLifecycleProviderTest
             // Create provider
             Map<String, String> params = Map.of(
             ProcessLifecycleProvider.OPT_STATE_DIR, lifecycleStateDir.toString(),
-            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, "/default/cassandra/home"
+            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, defaultCassandraHome.toString()
             );
             ProcessLifecycleProvider provider = new ProcessLifecycleProvider(params);
 
@@ -369,7 +380,7 @@ public class ProcessLifecycleProviderTest
             // Create provider
             Map<String, String> params = Map.of(
             ProcessLifecycleProvider.OPT_STATE_DIR, lifecycleStateDir.toString(),
-            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, "/default/cassandra/home"
+            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, defaultCassandraHome.toString()
             );
             ProcessLifecycleProvider provider = new ProcessLifecycleProvider(params);
 
@@ -417,7 +428,7 @@ public class ProcessLifecycleProviderTest
             // Create provider
             Map<String, String> params = Map.of(
             ProcessLifecycleProvider.OPT_STATE_DIR, lifecycleStateDir.toString(),
-            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, "/default/cassandra/home"
+            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, defaultCassandraHome.toString()
             );
             ProcessLifecycleProvider provider = new ProcessLifecycleProvider(params);
 
@@ -600,7 +611,7 @@ public class ProcessLifecycleProviderTest
             // Create provider
             Map<String, String> params = Map.of(
             ProcessLifecycleProvider.OPT_STATE_DIR, lifecycleStateDir.toString(),
-            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, "/default/cassandra/home"
+            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, defaultCassandraHome.toString()
             );
             FakeProcessLifecycleProvider provider = new FakeProcessLifecycleProvider(params);
 
@@ -650,7 +661,7 @@ public class ProcessLifecycleProviderTest
             // Create provider
             Map<String, String> params = Map.of(
             ProcessLifecycleProvider.OPT_STATE_DIR, lifecycleStateDir.toString(),
-            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, "/default/cassandra/home"
+            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, defaultCassandraHome.toString()
             );
             FakeProcessLifecycleProvider provider = new FakeProcessLifecycleProvider(params);
 
@@ -689,5 +700,33 @@ public class ProcessLifecycleProviderTest
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Failed to forcibly destroy process");
         }
+    }
+
+    @Test
+    void testThrowsExceptionWhenStateDirDoesNotExist()
+    {
+        Map<String, String> params = Map.of(
+        ProcessLifecycleProvider.OPT_STATE_DIR, "/nonexistent/state/dir",
+        ProcessLifecycleProvider.OPT_CASSANDRA_HOME, defaultCassandraHome.toString()
+        );
+
+        assertThatThrownBy(() -> new ProcessLifecycleProvider(params))
+            .isInstanceOf(ConfigurationException.class)
+            .hasMessageContaining("State directory")
+            .hasMessageContaining("does not exist or is not a directory");
+    }
+
+    @Test
+    void testThrowsExceptionWhenCassandraHomeDoesNotExist()
+    {
+        Map<String, String> params = Map.of(
+        ProcessLifecycleProvider.OPT_STATE_DIR, lifecycleStateDir.toString(),
+        ProcessLifecycleProvider.OPT_CASSANDRA_HOME, "/nonexistent/cassandra/home"
+        );
+
+        assertThatThrownBy(() -> new ProcessLifecycleProvider(params))
+            .isInstanceOf(ConfigurationException.class)
+            .hasMessageContaining("Cassandra home")
+            .hasMessageContaining("does not exist or is not a directory");
     }
 }
