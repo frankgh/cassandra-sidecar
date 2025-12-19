@@ -21,6 +21,7 @@ package org.apache.cassandra.sidecar.lifecycle;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -315,7 +316,7 @@ public class ProcessLifecycleProvider implements LifecycleProvider
             ProcessBuilder pb = new ProcessBuilder("ps", "-p", String.valueOf(pid), "-o", "args=");
             Process proc = pb.start();
             try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(proc.getInputStream())))
+                    new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8)))
             {
                 String line = reader.readLine();
                 proc.waitFor(5, TimeUnit.SECONDS);
@@ -338,7 +339,7 @@ public class ProcessLifecycleProvider implements LifecycleProvider
     {
         try
         {
-            String pidFileContent = Files.readString(pidFilePath).trim();
+            String pidFileContent = Files.readString(pidFilePath, StandardCharsets.UTF_8).trim();
             return Long.parseLong(pidFileContent);
         }
         catch (IOException | NumberFormatException e)
