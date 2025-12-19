@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -34,9 +35,12 @@ import org.mockito.MockedStatic;
 
 import static org.apache.cassandra.sidecar.lifecycle.ProcessLifecycleProvider.getPidFileLocation;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -586,5 +590,104 @@ public class ProcessLifecycleProviderTest
 
         // Verify the file still doesn't exist
         assertThat(pidFilePath).doesNotExist();
+    }
+
+    @Test
+    void testStopCallsDestroyForciblyOnTimeout() throws Exception
+    {
+        try (MockedStatic<ProcessHandle> processHandleMock = mockStatic(ProcessHandle.class))
+        {
+            // Create provider
+            Map<String, String> params = Map.of(
+            ProcessLifecycleProvider.OPT_STATE_DIR, lifecycleStateDir.toString(),
+            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, "/default/cassandra/home"
+            );
+            FakeProcessLifecycleProvider provider = new FakeProcessLifecycleProvider(params);
+
+            // Create mock instance metadata
+            InstanceMetadata instance = mock(InstanceMetadata.class);
+            when(instance.host()).thenReturn("localhost");
+            when(instance.storageDir()).thenReturn("/storage/dir");
+            when(instance.lifecycleOptions()).thenReturn(Map.of());
+
+            // Create a PID file
+            String pidFileLocation = getPidFileLocation(lifecycleStateDir.toString(), "localhost");
+            Path pidFilePath = Path.of(pidFileLocation);
+            Files.writeString(pidFilePath, "12345");
+
+            // Mock ProcessHandle that times out on graceful termination but succeeds with force
+            ProcessHandle mockHandle = mock(ProcessHandle.class);
+            ProcessHandle.Info mockInfo = mock(ProcessHandle.Info.class);
+            when(mockHandle.isAlive()).thenReturn(true);
+            when(mockHandle.info()).thenReturn(mockInfo);
+            when(mockInfo.commandLine()).thenReturn(Optional.of("java org.apache.cassandra.service.CassandraDaemon"));
+            when(mockHandle.pid()).thenReturn(12345L);
+
+            // Simulate timeout by mocking CompletableFuture.get() to throw TimeoutException
+            @SuppressWarnings("unchecked")
+            CompletableFuture<ProcessHandle> timeoutFuture = mock(CompletableFuture.class);
+            when(timeoutFuture.get(anyLong(), any())).thenThrow(new TimeoutException("Simulated timeout"));
+            when(mockHandle.onExit()).thenReturn(timeoutFuture);
+            when(mockHandle.destroy()).thenReturn(true);
+            when(mockHandle.destroyForcibly()).thenReturn(true);
+
+            processHandleMock.when(() -> ProcessHandle.of(12345L))
+                             .thenReturn(Optional.of(mockHandle));
+
+            // Call stop - should call destroyForcibly after timeout
+            provider.stop(instance);
+
+            // Verify destroyForcibly was called
+            verify(mockHandle).destroyForcibly();
+        }
+    }
+
+    @Test
+    void testStopThrowsExceptionWhenDestroyForciblyFails() throws Exception
+    {
+        try (MockedStatic<ProcessHandle> processHandleMock = mockStatic(ProcessHandle.class))
+        {
+            // Create provider
+            Map<String, String> params = Map.of(
+            ProcessLifecycleProvider.OPT_STATE_DIR, lifecycleStateDir.toString(),
+            ProcessLifecycleProvider.OPT_CASSANDRA_HOME, "/default/cassandra/home"
+            );
+            FakeProcessLifecycleProvider provider = new FakeProcessLifecycleProvider(params);
+
+            // Create mock instance metadata
+            InstanceMetadata instance = mock(InstanceMetadata.class);
+            when(instance.host()).thenReturn("localhost");
+            when(instance.storageDir()).thenReturn("/storage/dir");
+            when(instance.lifecycleOptions()).thenReturn(Map.of());
+
+            // Create a PID file
+            String pidFileLocation = getPidFileLocation(lifecycleStateDir.toString(), "localhost");
+            Path pidFilePath = Path.of(pidFileLocation);
+            Files.writeString(pidFilePath, "12345");
+
+            // Mock ProcessHandle that times out and fails to force destroy
+            ProcessHandle mockHandle = mock(ProcessHandle.class);
+            ProcessHandle.Info mockInfo = mock(ProcessHandle.Info.class);
+            when(mockHandle.isAlive()).thenReturn(true);
+            when(mockHandle.info()).thenReturn(mockInfo);
+            when(mockInfo.commandLine()).thenReturn(Optional.of("java org.apache.cassandra.service.CassandraDaemon"));
+            when(mockHandle.pid()).thenReturn(12345L);
+
+            // Simulate timeout by mocking CompletableFuture.get() to throw TimeoutException
+            @SuppressWarnings("unchecked")
+            CompletableFuture<ProcessHandle> timeoutFuture = mock(CompletableFuture.class);
+            when(timeoutFuture.get(anyLong(), any())).thenThrow(new TimeoutException("Simulated timeout"));
+            when(mockHandle.onExit()).thenReturn(timeoutFuture);
+            when(mockHandle.destroy()).thenReturn(true);
+            when(mockHandle.destroyForcibly()).thenReturn(false); // Force destroy fails
+
+            processHandleMock.when(() -> ProcessHandle.of(12345L))
+                             .thenReturn(Optional.of(mockHandle));
+
+            // Call stop - should throw exception because destroyForcibly returned false
+            assertThatThrownBy(() -> provider.stop(instance))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Failed to forcibly destroy process");
+        }
     }
 }

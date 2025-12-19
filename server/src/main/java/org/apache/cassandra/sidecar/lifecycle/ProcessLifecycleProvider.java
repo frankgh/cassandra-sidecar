@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -153,8 +154,22 @@ public class ProcessLifecycleProvider implements LifecycleProvider
             {
                 LOG.info("Stopping process of Cassandra instance {} with PID {}.", casCfg.instanceName(), pid);
                 CompletableFuture<ProcessHandle> terminationFuture = processHandle.get().onExit();
-                processHandle.get().destroy();  // blocking call, make async?
-                terminationFuture.get(CASSANDRA_PROCESS_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                processHandle.get().destroy();
+                try
+                {
+                    terminationFuture.get(CASSANDRA_PROCESS_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                }
+                catch (TimeoutException e)
+                {
+                    LOG.warn("Process {} did not terminate within timeout, forcing destroy.", pid);
+                    boolean destroyed = processHandle.get().destroyForcibly();
+                    if (!destroyed)
+                    {
+                        throw new RuntimeException("Failed to forcibly destroy process " + pid +
+                                                   " for Cassandra instance " + casCfg.instanceName(), e);
+                    }
+                    LOG.info("Process {} was forcibly destroyed.", pid);
+                }
                 Files.deleteIfExists(Path.of(pidFileLocation));
             }
             else
