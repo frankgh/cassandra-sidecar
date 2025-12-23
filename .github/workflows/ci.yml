@@ -331,7 +331,7 @@ jobs:
             -PdtestVersion=${{ matrix.dtestVersion }} \
             -PtarballVersion=${{ matrix.cassandra }} \
             -Dcassandra.sidecar.versions_to_test="${{ matrix.cassandra }}" \
-            integrationTestHeavyWeight \
+            jar integrationTestHeavyWeight \
             --stacktrace
         env:
           CASSANDRA_DEP_DIR: ${{ github.workspace }}/dtest-jars
