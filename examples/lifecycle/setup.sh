@@ -42,13 +42,15 @@ if [ -f ${CASSANDRA_HOME}/bin/cassandra ]; then
 else
   echo "Installing Cassandra at ${CASSANDRA_HOME}"
   echo "Downloading ${TARBALL_URL}"
-  wget -P ${TMP_DIR} ${TARBALL_URL}
+  curl -L -o ${TMP_DIR}/$(basename ${TARBALL_URL}) ${TARBALL_URL}
 
-  echo "Extracting tarball"
+  echo "Extracting Cassandra tarball"
   tar -xvzf ${TMP_DIR}/${TARBALL_NAME} -C $(dirname $CASSANDRA_HOME)
 fi
 
-echo "Creating configuration"
+echo "Creating Sidecar configuration"
 cp -r ${CASSANDRA_HOME}/conf/* ${CASSANDRA_CONF}
 sed "s#\$cassandraHome#${CASSANDRA_HOME}#g" ${SIDECAR_YAML_TEMPLATE} > ${SIDECAR_YAML}
 sed -i '' "s#\$baseDir#${NODE_DIR}#g" ${SIDECAR_YAML}
+
+echo "Setup complete!"

@@ -18,109 +18,56 @@
 
 package org.apache.cassandra.sidecar.lifecycle;
 
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
+import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
+import org.apache.cassandra.sidecar.common.DataObjectBuilder;
+import org.apache.cassandra.sidecar.exceptions.ConfigurationException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.VisibleForTesting;
 
 /**
  * Represents the configuration for a Cassandra process instance.
  */
 public class ProcessRuntimeConfiguration
 {
-    static class Builder
-    {
-        private String host;
-        private String cassandraHome;
-        private String cassandraConfDir;
-        private String cassandraLogDir;
-        private String storageDir;
-        private Map<String, String> jvmOpts;
-        private Map<String, String> envVars;
-
-        public Builder withHost(String host)
-        {
-            this.host = host;
-            return this;
-        }
-
-        public Builder withCassandraHome(String cassandraHome)
-        {
-            this.cassandraHome = cassandraHome;
-            return this;
-        }
-
-        public Builder withCassandraConfDir(String cassandraConfDir)
-        {
-            this.cassandraConfDir = cassandraConfDir;
-            return this;
-        }
-
-        public Builder withCassandraLogDir(String cassandraLogDir)
-        {
-            this.cassandraLogDir = cassandraLogDir;
-            return this;
-        }
-
-        public Builder withStorageDir(String storageDir)
-        {
-            this.storageDir = storageDir;
-            return this;
-        }
-
-        public Builder withJvmOptions(Map<String, String> jvmOptions)
-        {
-            this.jvmOpts = jvmOptions;
-            return this;
-        }
-
-        public Builder withEnvVars(Map<String, String> envVars)
-        {
-            this.envVars = envVars;
-            return this;
-        }
-
-        public ProcessRuntimeConfiguration build()
-        {
-            ProcessRuntimeConfiguration casCfg = new ProcessRuntimeConfiguration(host, cassandraHome, cassandraConfDir, cassandraLogDir, storageDir);
-            casCfg.extraEnvVars.putAll(envVars != null ? envVars : Map.of());
-            casCfg.extraJvmOpts.putAll(jvmOpts != null ? jvmOpts : Map.of());
-            return casCfg;
-        }
-    }
-
+    private final InstanceMetadata instance;
     @NotNull
-    final String instanceName;
-    @NotNull
-    final Path cassandraHome;
+    private final Path cassandraHome;
+    private final Path cassandraYaml;
+    @VisibleForTesting
     @NotNull
     final Path cassandraConfDir;
+    @VisibleForTesting
     @Nullable
     final String cassandraLogDir;
+    @VisibleForTesting
     @Nullable
     final String storageDir;
-    final Map<String, String> extraJvmOpts = new HashMap<>();
-    final Map<String, String> extraEnvVars = new HashMap<>();
+    private final Map<String, String> extraJvmOptions;
+    private final Map<String, String> extraEnvironmentVariables;
 
-    private ProcessRuntimeConfiguration(@NotNull String host, String cassandraHome, String cassandraConfDir,
-                                        @Nullable String cassandraLogDir, @Nullable String storageDir)
+    private ProcessRuntimeConfiguration(Builder builder)
     {
-        this.instanceName = host;
-        this.cassandraHome = Path.of(cassandraHome);
-        this.cassandraConfDir = Path.of(cassandraConfDir);
-        this.cassandraLogDir = cassandraLogDir;
-        this.storageDir = storageDir;
+        instance = builder.instance;
+        cassandraHome = Path.of(builder.cassandraHome);
+        cassandraConfDir = Path.of(builder.cassandraConfDir);
+        cassandraLogDir = builder.cassandraLogDir;
+        cassandraYaml = builder.cassandraYamlPath == null ? cassandraConfDir.resolve("cassandra.yaml") : Path.of(builder.cassandraYamlPath);
+        extraEnvironmentVariables = builder.extraEnvironmentVariables == null ? Map.of() : Map.copyOf(builder.extraEnvironmentVariables);
+        storageDir = builder.storageDir;
+        extraJvmOptions = builder.extraJvmOptions == null ? Map.of() : Map.copyOf(builder.extraJvmOptions);
     }
 
-    public String instanceName()
+    public InstanceMetadata instance()
     {
-        return instanceName;
+        return instance;
     }
 
     public Path cassandraHome()
@@ -135,50 +82,45 @@ public class ProcessRuntimeConfiguration
 
     public Path cassandraBin()
     {
-        return cassandraHome.resolve(Path.of("bin", "cassandra"));
+        return cassandraHome.resolve("bin").resolve("cassandra");
     }
 
-    public Path stopServerBin()
+    public Path cassandraYaml()
     {
-        return cassandraHome.resolve(Path.of("bin", "stop-server"));
+        return cassandraYaml;
     }
 
-    private Path cassandraYaml()
-    {
-        return cassandraConfDir.resolve(Path.of("cassandra.yaml"));
-    }
-
-    public void validateStart() throws IllegalArgumentException
+    public void validateStart() throws ConfigurationException
     {
         // Check existence
         if (!Files.isDirectory(cassandraHome))
         {
-            throw new IllegalArgumentException("Cassandra home does not exist or is not a directory: " + cassandraHome);
+            throw new ConfigurationException("Cassandra home does not exist or is not a directory: " + cassandraHome);
         }
         if (!Files.isDirectory(cassandraConfDir))
         {
-            throw new IllegalArgumentException("Cassandra configuration directory does not exist or is not a directory: " + cassandraConfDir);
+            throw new ConfigurationException("Cassandra configuration directory does not exist or is not a directory: " + cassandraConfDir);
         }
         if (!Files.isRegularFile(cassandraYaml()))
         {
-            throw new IllegalArgumentException("Cassandra YAML configuration file does not exist: " + cassandraYaml());
+            throw new ConfigurationException("Cassandra YAML configuration file does not exist: " + cassandraYaml());
         }
         if (!Files.isRegularFile(cassandraBin()))
         {
-            throw new IllegalArgumentException("Cassandra binary does not exist or is not a regular file: " + cassandraBin());
+            throw new ConfigurationException("Cassandra binary does not exist or is not a regular file: " + cassandraBin());
         }
         // Check permissions
         if (!Files.isExecutable(cassandraBin()))
         {
-            throw new IllegalArgumentException("Cassandra binary is not executable: " + cassandraBin());
+            throw new ConfigurationException("Cassandra binary is not executable: " + cassandraBin());
         }
         if (!Files.isReadable(cassandraConfDir))
         {
-            throw new IllegalArgumentException("Cassandra configuration directory is not readable: " + cassandraConfDir);
+            throw new ConfigurationException("Cassandra configuration directory is not readable: " + cassandraConfDir);
         }
     }
 
-    public ProcessBuilder buildStartCommand(String pidFileLocation, String stdoutFileLocation, String stderrFileLocation)
+    public ProcessBuilder buildStartCommand(String pidFileLocation, Path stdoutFileLocation, Path stderrFileLocation)
     {
         validateStart();
 
@@ -186,7 +128,7 @@ public class ProcessRuntimeConfiguration
         startCassandraCmd.add(cassandraBin().toString());
         startCassandraCmd.add("-p");
         startCassandraCmd.add(pidFileLocation);
-        for (Map.Entry<String, String> jvmOpt : extraJvmOpts.entrySet())
+        for (Map.Entry<String, String> jvmOpt : extraJvmOptions.entrySet())
         {
             startCassandraCmd.add("-D" + jvmOpt.getKey() + "=" + jvmOpt.getValue());
         }
@@ -205,7 +147,7 @@ public class ProcessRuntimeConfiguration
         Map<String, String> env = processBuilder.environment();
         env.put("CASSANDRA_HOME", cassandraHome().toString());
         env.put("CASSANDRA_CONF", cassandraConf());
-        env.putAll(extraEnvVars);
+        env.putAll(extraEnvironmentVariables);
 
         // Only override CASSANDRA_LOG_DIR if it is set in the configuration
         if (cassandraLogDir != null)
@@ -214,24 +156,98 @@ public class ProcessRuntimeConfiguration
         }
 
         // Redirect output to logs
-        processBuilder.redirectOutput(ProcessBuilder.Redirect.to(new File(stdoutFileLocation)));
-        processBuilder.redirectError(ProcessBuilder.Redirect.to(new File(stderrFileLocation)));
+        processBuilder.redirectOutput(ProcessBuilder.Redirect.to(stdoutFileLocation.toFile()));
+        processBuilder.redirectError(ProcessBuilder.Redirect.to(stderrFileLocation.toFile()));
 
         // Set working directory
         processBuilder.directory(cassandraHome().toFile());
         return processBuilder;
     }
 
+    @Override
     public String toString()
     {
         return "ProcessRuntimeConfiguration{" +
-               "instanceName='" + instanceName + '\'' +
+               "instance=" + instance +
                ", cassandraHome=" + cassandraHome +
                ", cassandraConfDir=" + cassandraConfDir +
                ", cassandraLogDir='" + cassandraLogDir + '\'' +
                ", storageDir='" + storageDir + '\'' +
-               ", extraJvmOpts=" + extraJvmOpts +
-               ", extraEnvVars=" + extraEnvVars +
+               ", extraJvmOpts=" + extraJvmOptions +
+               ", extraEnvVars=" + extraEnvironmentVariables +
                '}';
+    }
+
+    public static Builder builder()
+    {
+        return new Builder();
+    }
+
+    public static final class Builder implements DataObjectBuilder<Builder, ProcessRuntimeConfiguration>
+    {
+        private InstanceMetadata instance;
+        private String cassandraHome;
+        private String cassandraConfDir;
+        private @Nullable String cassandraLogDir;
+        private @Nullable String cassandraYamlPath;
+        private @Nullable String storageDir;
+        private Map<String, String> extraJvmOptions;
+        private Map<String, String> extraEnvironmentVariables;
+
+        private Builder()
+        {
+        }
+
+        @Override
+        public Builder self()
+        {
+            return this;
+        }
+
+        public Builder instance(InstanceMetadata instance)
+        {
+            return update(b -> b.instance = Objects.requireNonNull(instance, "instance is required"));
+        }
+
+        public Builder cassandraHome(@NotNull String cassandraHome)
+        {
+            return update(b -> b.cassandraHome = Objects.requireNonNull(cassandraHome, "cassandraHome is required"));
+        }
+
+        public Builder cassandraConfDir(@NotNull String cassandraConfDir)
+        {
+            return update(b -> b.cassandraConfDir = Objects.requireNonNull(cassandraConfDir, "cassandraConfDir is required"));
+        }
+
+        public Builder cassandraLogDir(@Nullable String cassandraLogDir)
+        {
+            return update(b -> b.cassandraLogDir = cassandraLogDir);
+        }
+
+        public Builder cassandraYamlPath(@Nullable String cassandraYamlPath)
+        {
+            return update(b -> b.cassandraYamlPath = cassandraYamlPath);
+        }
+
+        public Builder storageDir(@Nullable String storageDir)
+        {
+            return update(b -> b.storageDir = storageDir);
+        }
+
+        public Builder extraJvmOptions(Map<String, String> extraJvmOptions)
+        {
+            return update(b -> b.extraJvmOptions = extraJvmOptions);
+        }
+
+        public Builder extraEnvironmentVariables(Map<String, String> extraEnvironmentVariables)
+        {
+            return update(b -> b.extraEnvironmentVariables = extraEnvironmentVariables);
+        }
+
+        @Override
+        public ProcessRuntimeConfiguration build()
+        {
+            return new ProcessRuntimeConfiguration(this);
+        }
     }
 }

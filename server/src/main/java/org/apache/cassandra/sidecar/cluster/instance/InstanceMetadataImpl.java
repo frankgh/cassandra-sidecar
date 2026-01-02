@@ -28,7 +28,6 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import com.codahale.metrics.MetricRegistry;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
 import org.apache.cassandra.sidecar.common.DataObjectBuilder;
 import org.apache.cassandra.sidecar.common.server.dns.DnsResolver;
@@ -95,8 +94,8 @@ public class InstanceMetadataImpl implements InstanceMetadata
         savedCachesDir = builder.resolveSavedCachesDir();
         localSystemDataFileDir = FileUtils.maybeResolveHomeDirectory(builder.localSystemDataFileDir);
         lifecycleOptions = builder.lifecycleOptions != null
-                                 ? Collections.unmodifiableMap(builder.lifecycleOptions)
-                                 : Collections.emptyMap();
+                           ? Collections.unmodifiableMap(builder.lifecycleOptions)
+                           : Collections.emptyMap();
         storageDir = builder.storageDir;
     }
 
@@ -148,7 +147,7 @@ public class InstanceMetadataImpl implements InstanceMetadata
     @Override
     public String storageDir()
     {
-        return  storageDir;
+        return storageDir;
     }
 
     @Override
@@ -207,7 +206,7 @@ public class InstanceMetadataImpl implements InstanceMetadata
      * @return The lifecycle options for this Cassandra instance
      */
     @Override
-    @JsonProperty("lifecycle_options")
+    @NotNull
     public Map<String, String> lifecycleOptions()
     {
         return lifecycleOptions;

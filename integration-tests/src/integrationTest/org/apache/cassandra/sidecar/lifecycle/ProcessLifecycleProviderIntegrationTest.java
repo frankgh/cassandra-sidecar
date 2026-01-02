@@ -24,7 +24,6 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -42,11 +41,14 @@ import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.codahale.metrics.MetricRegistry;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import io.vertx.core.Vertx;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.junit5.VertxExtension;
+import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
+import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadataImpl;
 import org.apache.cassandra.sidecar.modules.SidecarModules;
 import org.apache.cassandra.sidecar.server.Server;
 
@@ -60,12 +62,14 @@ import static org.apache.cassandra.sidecar.utils.TestFileUtils.replacePlaceholde
  */
 @ExtendWith(VertxExtension.class)
 @Tag("heavy")
-public class ProcessLifecycleProviderIntegrationTest
+class ProcessLifecycleProviderIntegrationTest
 {
     static final String TEST_NODE = "localhost";
+    static final int TEST_NODE_ID = 1;
     static final int TIMEOUT_SECONDS = 30;
 
-    protected static final Logger LOG = LoggerFactory.getLogger(ProcessLifecycleProviderIntegrationTest.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProcessLifecycleProviderIntegrationTest.class);
+    private static final MetricRegistry METRIC_REGISTRY = new MetricRegistry();
 
     static String sidecarDeploymentId;
     static Path lifecycleDir;
@@ -79,29 +83,27 @@ public class ProcessLifecycleProviderIntegrationTest
     private static Vertx vertx;
     private static WebClient client;
 
-    private static ProcessRuntimeConfiguration cassandraConfig;
-
     @BeforeAll
-    public static void setup() throws IOException, URISyntaxException, ExecutionException, InterruptedException, TimeoutException
+    public static void setup() throws Exception
     {
-        LOG.info("Created temporary directory for test: {}", tmpDir);
+        LOGGER.info("Created temporary directory for test: {}", tmpDir);
 
         // Setup Cassandra
         Path cassandraInstallDir = tmpDir.resolve("opt");
         Path cassandraConfDir = Files.createDirectories(tmpDir.resolve("etc/cassandra"));
-        cassandraConfig = installCassandra(cassandraInstallDir, cassandraConfDir);
+        ProcessRuntimeConfiguration cassandraConfig = installCassandra(cassandraInstallDir, cassandraConfDir);
 
         // Setup sidecar configuration
         lifecycleDir = Files.createDirectories(tmpDir.resolve("var/lib/sidecar/lifecycle"));
         Path sidecarYaml = createSidecarYaml(cassandraConfig, lifecycleDir);
-        LOG.info("Testing with cassandra config at: {} and sidecar yaml at: {}", cassandraConfig.cassandraConf(), sidecarYaml);
+        LOGGER.info("Testing with cassandra config at: {} and sidecar yaml at: {}", cassandraConfig.cassandraConf(), sidecarYaml);
         configureSidecar(sidecarYaml);
 
         sidecarDeploymentId = server.start().toCompletionStage().toCompletableFuture().get(TIMEOUT_SECONDS, SECONDS);
     }
 
     @AfterAll
-    public static void tearDown() throws ExecutionException, InterruptedException, TimeoutException, IOException
+    public static void tearDown() throws ExecutionException, InterruptedException, TimeoutException
     {
         server.stop(sidecarDeploymentId).toCompletionStage().toCompletableFuture().get(TIMEOUT_SECONDS, SECONDS);
         // Make sure server is stopped
@@ -110,10 +112,10 @@ public class ProcessLifecycleProviderIntegrationTest
 
     private static void forceCassandraStop()
     {
-        Path pidFileLocation = Path.of(ProcessLifecycleProvider.getPidFileLocation(lifecycleDir.toString(), TEST_NODE));
+        Path pidFileLocation = Path.of(ProcessLifecycleProvider.pidFileLocation(lifecycleDir.toString(), TEST_NODE_ID));
         if (!pidFileLocation.toFile().exists())
         {
-            LOG.info("No PID file exists, Cassandra already stopped.");
+            LOGGER.info("No PID file exists, Cassandra already stopped.");
             return;
         }
         Long pid = ProcessLifecycleProvider.readPidFromFile(pidFileLocation);
@@ -122,7 +124,7 @@ public class ProcessLifecycleProviderIntegrationTest
             Optional<ProcessHandle> processHandle = ProcessHandle.of(pid);
             if (processHandle.isPresent())
             {
-                LOG.info("Killing Cassandra process with PID {}", pid);
+                LOGGER.info("Killing Cassandra process with PID {}", pid);
                 CompletableFuture<ProcessHandle> terminationFuture = processHandle.get().onExit();
                 processHandle.get().destroyForcibly();
                 terminationFuture.get(TIMEOUT_SECONDS, SECONDS);
@@ -130,7 +132,7 @@ public class ProcessLifecycleProviderIntegrationTest
         }
         catch (InterruptedException | ExecutionException | TimeoutException e)
         {
-            LOG.error("Failed to kill Cassandra process with PID {}", pid, e);
+            LOGGER.error("Failed to kill Cassandra process with PID {}", pid, e);
             throw new RuntimeException("Failed to kill Cassandra process", e);
         }
     }
@@ -147,20 +149,19 @@ public class ProcessLifecycleProviderIntegrationTest
     void testProcessLifecycleProviderStartAndStopAndRecoveryAfterCrash() throws Exception
     {
         LifecycleProviderIntegrationTester tester = new LifecycleProviderIntegrationTester(
-                            client,
-                            TEST_NODE,
-                            server.actualPort(),
-                            ProcessLifecycleProviderIntegrationTest::forceCassandraStop);
+        client,
+        TEST_NODE,
+        server.actualPort(),
+        ProcessLifecycleProviderIntegrationTest::forceCassandraStop);
 
         tester.testLifecycleProviderStartAndStopAndRecoveryAfterCrash();
-
     }
 
     private static Path createSidecarYaml(ProcessRuntimeConfiguration cassandraConfig, Path lifecycleDir) throws IOException, URISyntaxException
     {
         Path sidecarConfDir = Files.createDirectories(tmpDir.resolve("etc/sidecar"));
         URL sidecarYamlTemplateUrl = ProcessLifecycleProviderIntegrationTest.class.getResource("/config/sidecar.yaml.template");
-        Path sidecarYamlTemplatePath = Paths.get(Objects.requireNonNull(sidecarYamlTemplateUrl).toURI());
+        Path sidecarYamlTemplatePath = Path.of(Objects.requireNonNull(sidecarYamlTemplateUrl).toURI());
         Path sidecarYaml = sidecarConfDir.resolve("sidecar.yaml");
         replacePlaceholdersInFileWithPattern(sidecarYamlTemplatePath,
                                              Map.of("cassandraHome", cassandraConfig.cassandraHome().toString(),
@@ -187,12 +188,21 @@ public class ProcessLifecycleProviderIntegrationTest
         copyDirectoryRecursively(originalCassandraConfDir, confDir);
         Path cassandraStorageDir = Files.createDirectories(tmpDir.resolve("var/lib/cassandra"));
         Path cassandraLogDir = Files.createDirectories(tmpDir.resolve("var/log"));
-        return new ProcessRuntimeConfiguration.Builder()
-               .withHost(TEST_NODE)
-               .withCassandraHome(cassandraHome.toString())
-               .withCassandraConfDir(confDir.toString())
-               .withCassandraLogDir(cassandraLogDir.toString())
-               .withStorageDir(cassandraStorageDir.toString())
-               .build();
+        return ProcessRuntimeConfiguration.builder()
+                                          .instance(instanceMetadata())
+                                          .cassandraHome(cassandraHome.toString())
+                                          .cassandraConfDir(confDir.toString())
+                                          .cassandraLogDir(cassandraLogDir.toString())
+                                          .storageDir(cassandraStorageDir.toString())
+                                          .build();
+    }
+
+    static InstanceMetadata instanceMetadata()
+    {
+        return InstanceMetadataImpl.builder()
+                                   .id(TEST_NODE_ID)
+                                   .metricRegistry(METRIC_REGISTRY)
+                                   .storageDir("/tmp/storage_dir")
+                                   .build();
     }
 }

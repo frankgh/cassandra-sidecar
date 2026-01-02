@@ -24,7 +24,6 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +36,7 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
 import org.apache.cassandra.sidecar.exceptions.ConfigurationException;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.VisibleForTesting;
 
 /**
@@ -47,9 +47,10 @@ public class ProcessLifecycleProvider implements LifecycleProvider
     static final String OPT_CASSANDRA_HOME = "cassandra_home";
     static final String OPT_CASSANDRA_CONF_DIR = "cassandra_conf_dir";
     static final String OPT_CASSANDRA_LOG_DIR = "cassandra_log_dir";
+    static final String OPT_CASSANDRA_YAML_PATH = "cassandra_yaml_path";
     static final String OPT_STATE_DIR = "state_dir";
 
-    protected static final Logger LOG = LoggerFactory.getLogger(ProcessLifecycleProvider.class);
+    protected static final Logger LOGGER = LoggerFactory.getLogger(ProcessLifecycleProvider.class);
     public static final long CASSANDRA_PROCESS_TIMEOUT_MS = Long.getLong("cassandra.sidecar.lifecycle.process.timeout.ms", 120_000L);
 
     private final String lifecycleDir;
@@ -57,18 +58,18 @@ public class ProcessLifecycleProvider implements LifecycleProvider
     private final Map<String, String> defaultJvmProperties = new HashMap<>();
     private final Map<String, String> defaultEnvVars = new HashMap<>();
 
-    public ProcessLifecycleProvider(Map<String, String> params)
+    public ProcessLifecycleProvider(@NotNull Map<String, String> params)
     {
         // Extract any JVM properties or environment variables from the params
         for (Map.Entry<String, String> entry : params.entrySet())
         {
-            if (entry.getKey().startsWith("cassandra."))
+            if (entry.getKey().startsWith("sys."))
             {
-                defaultJvmProperties.put(entry.getKey(), entry.getValue());
+                defaultJvmProperties.put(entry.getKey().replaceFirst("^sys\\.", ""), entry.getValue());
             }
             else if (entry.getKey().startsWith("env."))
             {
-                defaultEnvVars.put(entry.getKey().replaceAll("env.", ""), entry.getValue());
+                defaultEnvVars.put(entry.getKey().replaceFirst("^env\\.", ""), entry.getValue());
             }
         }
         this.lifecycleDir = params.get(OPT_STATE_DIR);
@@ -76,7 +77,35 @@ public class ProcessLifecycleProvider implements LifecycleProvider
         validateConfiguration();
     }
 
-    private void validateConfiguration()
+    @Override
+    public void start(InstanceMetadata instance)
+    {
+        if (isCassandraProcessRunning(instance))
+        {
+            LOGGER.info("Cassandra instance {} is already running.", instance);
+            return;
+        }
+        startCassandra(instance);
+    }
+
+    @Override
+    public void stop(InstanceMetadata instance)
+    {
+        if (!isCassandraProcessRunning(instance))
+        {
+            LOGGER.info("Cassandra instance {} is already stopped.", instance);
+            return;
+        }
+        stopCassandra(instance);
+    }
+
+    @Override
+    public boolean isRunning(InstanceMetadata instance)
+    {
+        return isCassandraProcessRunning(instance);
+    }
+
+    protected void validateConfiguration()
     {
         if (lifecycleDir == null || lifecycleDir.isEmpty())
         {
@@ -108,77 +137,50 @@ public class ProcessLifecycleProvider implements LifecycleProvider
         }
     }
 
-    @Override
-    public void start(InstanceMetadata instance)
-    {
-        if (isCassandraProcessRunning(instance))
-        {
-            LOG.info("Cassandra instance {} is already running.", instance.host());
-            return;
-        }
-        startCassandra(instance);
-    }
-
-    @Override
-    public void stop(InstanceMetadata instance)
-    {
-        if (!isCassandraProcessRunning(instance))
-        {
-            LOG.info("Cassandra instance {} is already stopped.", instance.host());
-            return;
-        }
-        stopCassandra(instance);
-    }
-
-    @Override
-    public boolean isRunning(InstanceMetadata instance)
-    {
-        return isCassandraProcessRunning(instance);
-    }
-
-    private void startCassandra(InstanceMetadata instance)
+    protected void startCassandra(InstanceMetadata instance)
     {
         ProcessRuntimeConfiguration runtimeConfig = getRuntimeConfiguration(instance);
         try
         {
-            String stdoutLocation = getStdoutLocation(runtimeConfig.instanceName());
-            String stderrLocation = getStderrLocation(runtimeConfig.instanceName());
-            String pidFileLocation = getPidFileLocation(runtimeConfig.instanceName());
+            Path stdoutLocation = stdoutLocation(runtimeConfig.instance());
+            Path stderrLocation = stderrLocation(runtimeConfig.instance());
+            String pidFileLocation = pidFileLocation(runtimeConfig.instance());
             ProcessBuilder processBuilder = runtimeConfig.buildStartCommand(pidFileLocation,
                                                                             stdoutLocation,
                                                                             stderrLocation);
-            LOG.info("Starting Cassandra instance {} with command: {}", runtimeConfig.instanceName(), processBuilder.command());
+            LOGGER.info("Starting Cassandra instance {} with command: {}", runtimeConfig.instance(), processBuilder.command());
 
             Process process = processBuilder.start();
             process.waitFor(CASSANDRA_PROCESS_TIMEOUT_MS, TimeUnit.MILLISECONDS); // blocking call, make async?
 
             if (isCassandraProcessRunning(instance))
             {
-                LOG.info("Started Cassandra instance {} with PID {}", runtimeConfig.instanceName(), readPidFromFile(Path.of(pidFileLocation)));
+                LOGGER.info("Started Cassandra instance {} with PID {}", runtimeConfig.instance(), readPidFromFile(Path.of(pidFileLocation)));
             }
             else
             {
-                throw new RuntimeException("Failed to start Cassandra instance " + runtimeConfig.instanceName() +
+                throw new RuntimeException("Failed to start Cassandra instance " + runtimeConfig.instance() +
                                            ". Check stdout at " + stdoutLocation + " and stderr at " + stderrLocation);
             }
         }
         catch (Throwable t)
         {
-            throw new RuntimeException("Failed to start Cassandra instance " + runtimeConfig.instanceName() + " due to " + t.getMessage(), t);
+            throw new RuntimeException("Failed to start Cassandra instance " + runtimeConfig.instance() + " due to " + t.getMessage(), t);
         }
     }
 
-    private void stopCassandra(InstanceMetadata instance)
+    protected void stopCassandra(InstanceMetadata instance)
     {
         ProcessRuntimeConfiguration casCfg = getRuntimeConfiguration(instance);
         try
         {
-            String pidFileLocation = getPidFileLocation(casCfg.instanceName());
-            Long pid = readPidFromFile(Path.of(pidFileLocation));
+            String pidFileLocation = pidFileLocation(casCfg.instance());
+            Path pidFilePath = Path.of(pidFileLocation);
+            Long pid = readPidFromFile(pidFilePath);
             Optional<ProcessHandle> processHandle = ProcessHandle.of(pid);
             if (processHandle.isPresent())
             {
-                LOG.info("Stopping process of Cassandra instance {} with PID {}.", casCfg.instanceName(), pid);
+                LOGGER.info("Stopping process of Cassandra instance {} with PID {}.", casCfg.instance(), pid);
                 CompletableFuture<ProcessHandle> terminationFuture = processHandle.get().onExit();
                 processHandle.get().destroy();
                 try
@@ -187,72 +189,76 @@ public class ProcessLifecycleProvider implements LifecycleProvider
                 }
                 catch (TimeoutException e)
                 {
-                    LOG.warn("Process {} did not terminate within timeout, forcing destroy.", pid);
+                    LOGGER.warn("Process {} did not terminate within timeout, forcing destroy.", pid);
                     boolean destroyed = processHandle.get().destroyForcibly();
                     if (!destroyed)
                     {
                         throw new RuntimeException("Failed to forcibly destroy process " + pid +
-                                                   " for Cassandra instance " + casCfg.instanceName(), e);
+                                                   " for Cassandra instance " + casCfg.instance(), e);
                     }
-                    LOG.info("Process {} was forcibly destroyed.", pid);
+                    LOGGER.info("Process {} was forcibly destroyed for instance {}", pid, casCfg.instance());
                 }
-                Files.deleteIfExists(Path.of(pidFileLocation));
+                Files.deleteIfExists(pidFilePath);
             }
             else
             {
-                LOG.warn("No process running for Cassandra instance {} with PID {}.", casCfg.instanceName(), pid);
+                LOGGER.warn("No process running for Cassandra instance {} with PID {}.", casCfg.instance(), pid);
             }
         }
         catch (Throwable t)
         {
-            throw new RuntimeException("Failed to stop process for Cassandra instance " + casCfg.instanceName() + " due to " + t.getMessage(), t);
+            throw new RuntimeException("Failed to stop process for Cassandra instance " + casCfg.instance() + " due to " + t.getMessage(), t);
         }
     }
 
     @VisibleForTesting
     protected ProcessRuntimeConfiguration getRuntimeConfiguration(InstanceMetadata instance)
     {
-        String cassandraHome = Optional.ofNullable(instance.lifecycleOptions().get(OPT_CASSANDRA_HOME))
-                                       .orElse(defaultCassandraHome);
-        String cassandraConfDir = instance.lifecycleOptions().get(OPT_CASSANDRA_CONF_DIR);
-        String cassandraLogDir = instance.lifecycleOptions().get(OPT_CASSANDRA_LOG_DIR);
-        return new ProcessRuntimeConfiguration.Builder()
-                                        .withHost(instance.host())
-                                        .withCassandraHome(cassandraHome)
-                                        .withCassandraConfDir(cassandraConfDir)
-                                        .withCassandraLogDir(cassandraLogDir)
-                                        .withStorageDir(instance.storageDir())
-                                        .withJvmOptions(defaultJvmProperties)
-                                        .withEnvVars(defaultEnvVars)
-                                        .build();
+        Map<String, String> options = instance.lifecycleOptions();
+        String cassandraHome = options.getOrDefault(OPT_CASSANDRA_HOME, defaultCassandraHome);
+        String cassandraConfDir = options.get(OPT_CASSANDRA_CONF_DIR);
+        String cassandraLogDir = options.get(OPT_CASSANDRA_LOG_DIR);
+        String cassandraYamlPath = options.get(OPT_CASSANDRA_YAML_PATH);
+        return ProcessRuntimeConfiguration.builder()
+                                          .instance(instance)
+                                          .cassandraHome(cassandraHome)
+                                          .cassandraConfDir(cassandraConfDir)
+                                          .cassandraLogDir(cassandraLogDir)
+                                          .cassandraYamlPath(cassandraYamlPath)
+                                          .storageDir(instance.storageDir())
+                                          .extraJvmOptions(defaultJvmProperties)
+                                          .extraEnvironmentVariables(defaultEnvVars)
+                                          .build();
     }
 
     /**
      * Checks whether a Cassandra instance is currently running as a local process
      * and automatically cleans up stale PID files.
      *
-     * Performs four validation steps:
-     * 1. Verifies the PID file exists and is readable. Returns false if not found.
-     * 2. Reads the PID and checks if the process is alive. Returns false and deletes the
-     *    PID file if the process no longer exists or is not alive.
-     * 3. Verifies the process is a Cassandra instance by checking for
-     *    org.apache.cassandra.service.CassandraDaemon in the command line. Returns true if
-     *    the command line contains the Cassandra daemon class or cannot be determined.
-     * 4. If the process is running but is not a Cassandra process, returns false and deletes
-     *    the stale PID file.
+     * <p>Performs four validation steps:
+     * <ol>
+     * <li>Verifies the PID file exists and is readable. Returns false if not found.
+     * <li>Reads the PID and checks if the process is alive. Returns false and deletes the
+     * PID file if the process no longer exists or is not alive.
+     * <li>Verifies the process is a Cassandra instance by checking for
+     * {@code org.apache.cassandra.service.CassandraDaemon} in the command line. Returns true if
+     * the command line contains the Cassandra daemon class or cannot be determined.
+     * <li>If the process is running but is not a Cassandra process, returns false and deletes
+     * the stale PID file.
+     * </ol>
      *
      * @param instance the instance metadata containing host information
      * @return true if the instance is running as a Cassandra process, false otherwise
      */
     private boolean isCassandraProcessRunning(InstanceMetadata instance)
     {
-        Path pidFilePath = Path.of(getPidFileLocation(instance.host()));
+        Path pidFilePath = Path.of(pidFileLocation(instance));
         try
         {
             // Case 1: PID file does not exist or is not readable
             if (!Files.isRegularFile(pidFilePath) || !Files.isReadable(pidFilePath))
             {
-                LOG.debug("PID file does not exist or is not readable for instance {} at path {}", instance.host(), pidFilePath);
+                LOGGER.warn("PID file does not exist or is not readable for instance {} at path {}", instance, pidFilePath);
                 return false;
             }
 
@@ -262,29 +268,29 @@ public class ProcessLifecycleProvider implements LifecycleProvider
             // Case 2: No process running with such PID or process is not alive
             if (processHandle.isEmpty() || !processHandle.get().isAlive())
             {
-                LOG.debug("No running process found with PID {} for instance {}", pid, instance.host());
+                LOGGER.warn("No running process found with PID {} for instance {}", pid, instance);
                 deletePidFile(instance, pidFilePath);
                 return false;
             }
-            
+
             // Case 3: Process with such PID is running - check if it's a Cassandra process
             // If we can't determine the command line, we assume it's Cassandra
             Optional<String> cmdLine = getCommandLinePlatformIndependent(processHandle.get());
             if (cmdLine.isEmpty() || cmdLine.get().contains("org.apache.cassandra.service.CassandraDaemon"))
             {
-                LOG.debug("Cassandra instance {} is running with PID {}", instance.host(), pid);
+                LOGGER.warn("Cassandra instance {} is running with PID {}", instance, pid);
                 return true;
             }
-            
+
             // Case 4: Process with such PID is running but it's not a Cassandra process
-            LOG.debug("Process with PID {} for instance {} is not a Cassandra process (command line: {}).",
-                        pid, instance.host(), cmdLine);
+            LOGGER.warn("Process with PID {} for instance {} is not a Cassandra process (command line: {}).",
+                        pid, instance, cmdLine);
             deletePidFile(instance, pidFilePath);
             return false;
         }
         catch (Exception e)
         {
-            LOG.warn("Failed to read PID from file {} for instance {}: {}", pidFilePath, instance.host(), e.getMessage());
+            LOGGER.warn("Failed to read PID from file {} for instance {}", pidFilePath, instance, e);
             return false;
         }
     }
@@ -293,12 +299,12 @@ public class ProcessLifecycleProvider implements LifecycleProvider
     {
         try
         {
-            LOG.info("Deleting stale PID file {} for instance {}", pidFilePath, instance.host());
+            LOGGER.info("Deleting stale PID file {} for instance {}", pidFilePath, instance);
             Files.delete(pidFilePath);
-        } 
+        }
         catch (Exception e)
         {
-            LOG.warn("Failed to delete stale PID file {} for instance {}: {}", pidFilePath, instance.host(), e.getMessage());
+            LOGGER.warn("Failed to delete stale PID file {} for instance {}", pidFilePath, instance, e);
         }
     }
 
@@ -307,7 +313,7 @@ public class ProcessLifecycleProvider implements LifecycleProvider
      * on some platforms (ie. Linux). To work around this, we use the 'ps' command to get the full command line.
      * This method should be platform-independent as it relies on the 'ps' command which is available on most Unix-like systems.
      * For non-Unix systems, we fall back to the default implementation.
-    */
+     */
     protected static Optional<String> getCommandLinePlatformIndependent(ProcessHandle processHandle)
     {
         long pid = processHandle.pid();
@@ -316,7 +322,7 @@ public class ProcessLifecycleProvider implements LifecycleProvider
             ProcessBuilder pb = new ProcessBuilder("ps", "-p", String.valueOf(pid), "-o", "args=");
             Process proc = pb.start();
             try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8)))
+            new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8)))
             {
                 String line = reader.readLine();
                 proc.waitFor(5, TimeUnit.SECONDS);
@@ -326,9 +332,9 @@ public class ProcessLifecycleProvider implements LifecycleProvider
                 }
             }
         }
-        catch (Exception e) 
+        catch (Exception e)
         {
-            LOG.warn("Failed to get command line via ps for PID {}", pid, e);
+            LOGGER.warn("Failed to get command line via ps for PID {}", pid, e);
         }
         // Fallback to default implementation
         return processHandle.info().commandLine();
@@ -337,35 +343,40 @@ public class ProcessLifecycleProvider implements LifecycleProvider
     @VisibleForTesting
     public static Long readPidFromFile(Path pidFilePath)
     {
+        String pidFileContent = null;
         try
         {
-            String pidFileContent = Files.readString(pidFilePath, StandardCharsets.UTF_8).trim();
+            pidFileContent = Files.readString(pidFilePath, StandardCharsets.UTF_8).trim();
             return Long.parseLong(pidFileContent);
         }
-        catch (IOException | NumberFormatException e)
+        catch (NumberFormatException e)
+        {
+            throw new RuntimeException("Unable to parse PID from file: " + pidFilePath + " content: " + pidFileContent, e);
+        }
+        catch (IOException e)
         {
             throw new RuntimeException("Failed to read PID from file: " + pidFilePath, e);
         }
     }
 
-    protected String getPidFileLocation(String host)
+    protected String pidFileLocation(InstanceMetadata instance)
     {
-        return getPidFileLocation(lifecycleDir, host);
+        return pidFileLocation(lifecycleDir, instance.id());
     }
 
-    protected String getStdoutLocation(String instanceName)
+    protected Path stdoutLocation(InstanceMetadata instance)
     {
-        return Paths.get(lifecycleDir, "cassandra-" + instanceName + ".out").toString();
+        return Path.of(lifecycleDir).resolve("start-cassandra-" + instance.id() + ".out");
     }
 
-    protected String getStderrLocation(String instanceName)
+    protected Path stderrLocation(InstanceMetadata instance)
     {
-        return Paths.get(lifecycleDir, "cassandra-" + instanceName + ".err").toString();
+        return Path.of(lifecycleDir).resolve("start-cassandra-" + instance.id() + ".err");
     }
 
     @VisibleForTesting
-    public static String getPidFileLocation(String lifecycleDir, String instanceName)
+    public static String pidFileLocation(String lifecycleDir, int instanceId)
     {
-        return Paths.get(lifecycleDir, "cassandra-" + instanceName + ".pid").toString();
+        return Path.of(lifecycleDir).resolve("cassandra-" + instanceId + ".pid").toString();
     }
 }

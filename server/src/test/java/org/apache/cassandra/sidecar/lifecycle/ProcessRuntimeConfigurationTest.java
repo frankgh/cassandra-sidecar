@@ -30,6 +30,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import com.codahale.metrics.MetricRegistry;
+import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
+import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadataImpl;
+import org.apache.cassandra.sidecar.exceptions.ConfigurationException;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,6 +44,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class ProcessRuntimeConfigurationTest
 {
+    private static final MetricRegistry METRIC_REGISTRY = new MetricRegistry();
+
     @TempDir
     Path tempDir;
 
@@ -69,11 +76,11 @@ class ProcessRuntimeConfigurationTest
     @Test
     void testValidateStartWithValidConfiguration()
     {
-        ProcessRuntimeConfiguration config = new ProcessRuntimeConfiguration.Builder()
-                                               .withHost("localhost")
-                                               .withCassandraHome(cassandraHome.toString())
-                                               .withCassandraConfDir(cassandraConfDir.toString())
-                                               .build();
+        ProcessRuntimeConfiguration config = ProcessRuntimeConfiguration.builder()
+                                                                        .instance(instanceMetadata())
+                                                                        .cassandraHome(cassandraHome.toString())
+                                                                        .cassandraConfDir(cassandraConfDir.toString())
+                                                                        .build();
 
         assertThatCode(config::validateStart).doesNotThrowAnyException();
     }
@@ -83,14 +90,14 @@ class ProcessRuntimeConfigurationTest
     {
         Path nonExistentHome = tempDir.resolve("nonexistent");
 
-        ProcessRuntimeConfiguration config = new ProcessRuntimeConfiguration.Builder()
-                                               .withHost("localhost")
-                                               .withCassandraHome(nonExistentHome.toString())
-                                               .withCassandraConfDir(cassandraConfDir.toString())
-                                               .build();
+        ProcessRuntimeConfiguration config = ProcessRuntimeConfiguration.builder()
+                                                                        .instance(instanceMetadata())
+                                                                        .cassandraHome(nonExistentHome.toString())
+                                                                        .cassandraConfDir(cassandraConfDir.toString())
+                                                                        .build();
 
         assertThatThrownBy(config::validateStart)
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(ConfigurationException.class)
         .hasMessageContaining("Cassandra home does not exist or is not a directory");
     }
 
@@ -99,14 +106,14 @@ class ProcessRuntimeConfigurationTest
     {
         Path homeAsFile = Files.createFile(tempDir.resolve("homeAsFile"));
 
-        ProcessRuntimeConfiguration config = new ProcessRuntimeConfiguration.Builder()
-                                               .withHost("localhost")
-                                               .withCassandraHome(homeAsFile.toString())
-                                               .withCassandraConfDir(cassandraConfDir.toString())
-                                               .build();
+        ProcessRuntimeConfiguration config = ProcessRuntimeConfiguration.builder()
+                                                                        .instance(instanceMetadata())
+                                                                        .cassandraHome(homeAsFile.toString())
+                                                                        .cassandraConfDir(cassandraConfDir.toString())
+                                                                        .build();
 
         assertThatThrownBy(config::validateStart)
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(ConfigurationException.class)
         .hasMessageContaining("Cassandra home does not exist or is not a directory");
     }
 
@@ -115,14 +122,14 @@ class ProcessRuntimeConfigurationTest
     {
         Path nonExistentConfDir = tempDir.resolve("nonexistent-conf");
 
-        ProcessRuntimeConfiguration config = new ProcessRuntimeConfiguration.Builder()
-                                               .withHost("localhost")
-                                               .withCassandraHome(cassandraHome.toString())
-                                               .withCassandraConfDir(nonExistentConfDir.toString())
-                                               .build();
+        ProcessRuntimeConfiguration config = ProcessRuntimeConfiguration.builder()
+                                                                        .instance(instanceMetadata())
+                                                                        .cassandraHome(cassandraHome.toString())
+                                                                        .cassandraConfDir(nonExistentConfDir.toString())
+                                                                        .build();
 
         assertThatThrownBy(config::validateStart)
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(ConfigurationException.class)
         .hasMessageContaining("Cassandra configuration directory does not exist or is not a directory");
     }
 
@@ -131,15 +138,32 @@ class ProcessRuntimeConfigurationTest
     {
         Files.delete(cassandraYaml);
 
-        ProcessRuntimeConfiguration config = new ProcessRuntimeConfiguration.Builder()
-                                               .withHost("localhost")
-                                               .withCassandraHome(cassandraHome.toString())
-                                               .withCassandraConfDir(cassandraConfDir.toString())
-                                               .build();
+        ProcessRuntimeConfiguration config = ProcessRuntimeConfiguration.builder()
+                                                                        .instance(instanceMetadata())
+                                                                        .cassandraHome(cassandraHome.toString())
+                                                                        .cassandraConfDir(cassandraConfDir.toString())
+                                                                        .build();
 
         assertThatThrownBy(config::validateStart)
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(ConfigurationException.class)
         .hasMessageContaining("Cassandra YAML configuration file does not exist");
+    }
+
+    @Test
+    void testCustomCassandraYamlFile() throws IOException
+    {
+        Path customCassandraYamlPath = Files.createFile(cassandraConfDir.resolve("custom-cassandra.yaml"));
+
+        ProcessRuntimeConfiguration config = ProcessRuntimeConfiguration.builder()
+                                                                        .instance(instanceMetadata())
+                                                                        .cassandraYamlPath(customCassandraYamlPath.toString())
+                                                                        .cassandraHome(cassandraHome.toString())
+                                                                        .cassandraConfDir(cassandraConfDir.toString())
+                                                                        .build();
+        // validate the process runtime configuration
+        config.validateStart();
+
+        assertThat(config.cassandraYaml()).isEqualTo(tempDir.resolve("conf").resolve("custom-cassandra.yaml"));
     }
 
     @Test
@@ -147,14 +171,14 @@ class ProcessRuntimeConfigurationTest
     {
         Files.delete(cassandraBin);
 
-        ProcessRuntimeConfiguration config = new ProcessRuntimeConfiguration.Builder()
-                                               .withHost("localhost")
-                                               .withCassandraHome(cassandraHome.toString())
-                                               .withCassandraConfDir(cassandraConfDir.toString())
-                                               .build();
+        ProcessRuntimeConfiguration config = ProcessRuntimeConfiguration.builder()
+                                                                        .instance(instanceMetadata())
+                                                                        .cassandraHome(cassandraHome.toString())
+                                                                        .cassandraConfDir(cassandraConfDir.toString())
+                                                                        .build();
 
         assertThatThrownBy(config::validateStart)
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(ConfigurationException.class)
         .hasMessageContaining("Cassandra binary does not exist or is not a regular file");
     }
 
@@ -166,14 +190,14 @@ class ProcessRuntimeConfigurationTest
         PosixFilePermission.OWNER_WRITE
         ));
 
-        ProcessRuntimeConfiguration config = new ProcessRuntimeConfiguration.Builder()
-                                               .withHost("localhost")
-                                               .withCassandraHome(cassandraHome.toString())
-                                               .withCassandraConfDir(cassandraConfDir.toString())
-                                               .build();
+        ProcessRuntimeConfiguration config = ProcessRuntimeConfiguration.builder()
+                                                                        .instance(instanceMetadata())
+                                                                        .cassandraHome(cassandraHome.toString())
+                                                                        .cassandraConfDir(cassandraConfDir.toString())
+                                                                        .build();
 
         assertThatThrownBy(config::validateStart)
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(ConfigurationException.class)
         .hasMessageContaining("Cassandra binary is not executable");
     }
 
@@ -185,31 +209,31 @@ class ProcessRuntimeConfigurationTest
         PosixFilePermission.OWNER_EXECUTE
         ));
 
-        ProcessRuntimeConfiguration config = new ProcessRuntimeConfiguration.Builder()
-                                               .withHost("localhost")
-                                               .withCassandraHome(cassandraHome.toString())
-                                               .withCassandraConfDir(cassandraConfDir.toString())
-                                               .build();
+        ProcessRuntimeConfiguration config = ProcessRuntimeConfiguration.builder()
+                                                                        .instance(instanceMetadata())
+                                                                        .cassandraHome(cassandraHome.toString())
+                                                                        .cassandraConfDir(cassandraConfDir.toString())
+                                                                        .build();
 
         assertThatThrownBy(config::validateStart)
-        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(ConfigurationException.class)
         .hasMessageContaining("Cassandra configuration directory is not readable");
     }
 
     @Test
     void testBuildStartCommand()
     {
-        ProcessRuntimeConfiguration config = new ProcessRuntimeConfiguration.Builder()
-                                               .withHost("localhost")
-                                               .withCassandraHome(cassandraHome.toString())
-                                               .withCassandraConfDir(cassandraConfDir.toString())
-                                               .withCassandraLogDir("/custom/log/dir")
-                                               .withStorageDir("/custom/storage/dir")
-                                               .build();
+        ProcessRuntimeConfiguration config = ProcessRuntimeConfiguration.builder()
+                                                                        .instance(instanceMetadata())
+                                                                        .cassandraHome(cassandraHome.toString())
+                                                                        .cassandraConfDir(cassandraConfDir.toString())
+                                                                        .cassandraLogDir("/custom/log/dir")
+                                                                        .storageDir("/custom/storage/dir")
+                                                                        .build();
 
         String pidFile = "/tmp/cassandra.pid";
-        String stdoutFile = "/tmp/cassandra.out";
-        String stderrFile = "/tmp/cassandra.err";
+        Path stdoutFile = Path.of("/tmp/cassandra.out");
+        Path stderrFile = Path.of("/tmp/cassandra.err");
 
         ProcessBuilder pb = config.buildStartCommand(pidFile, stdoutFile, stderrFile);
 
@@ -239,15 +263,15 @@ class ProcessRuntimeConfigurationTest
     @Test
     void testBuildStartCommandWithoutStorageAndLogDir()
     {
-        ProcessRuntimeConfiguration config = new ProcessRuntimeConfiguration.Builder()
-                                               .withHost("localhost")
-                                               .withCassandraHome(cassandraHome.toString())
-                                               .withCassandraConfDir(cassandraConfDir.toString())
-                                               .build();
+        ProcessRuntimeConfiguration config = ProcessRuntimeConfiguration.builder()
+                                                                        .instance(instanceMetadata())
+                                                                        .cassandraHome(cassandraHome.toString())
+                                                                        .cassandraConfDir(cassandraConfDir.toString())
+                                                                        .build();
 
         String pidFile = "/tmp/cassandra.pid";
-        String stdoutFile = "/tmp/cassandra.out";
-        String stderrFile = "/tmp/cassandra.err";
+        Path stdoutFile = Path.of("/tmp/cassandra.out");
+        Path stderrFile = Path.of("/tmp/cassandra.err");
 
         ProcessBuilder pb = config.buildStartCommand(pidFile, stdoutFile, stderrFile);
 
@@ -284,17 +308,17 @@ class ProcessRuntimeConfigurationTest
         "CUSTOM_VAR", "custom_value"
         );
 
-        ProcessRuntimeConfiguration config = new ProcessRuntimeConfiguration.Builder()
-                                               .withHost("localhost")
-                                               .withCassandraHome(cassandraHome.toString())
-                                               .withCassandraConfDir(cassandraConfDir.toString())
-                                               .withJvmOptions(extraJvmOpts)
-                                               .withEnvVars(extraEnvVars)
-                                               .build();
+        ProcessRuntimeConfiguration config = ProcessRuntimeConfiguration.builder()
+                                                                        .instance(instanceMetadata())
+                                                                        .cassandraHome(cassandraHome.toString())
+                                                                        .cassandraConfDir(cassandraConfDir.toString())
+                                                                        .extraJvmOptions(extraJvmOpts)
+                                                                        .extraEnvironmentVariables(extraEnvVars)
+                                                                        .build();
 
         String pidFile = "/tmp/cassandra.pid";
-        String stdoutFile = "/tmp/cassandra.out";
-        String stderrFile = "/tmp/cassandra.err";
+        Path stdoutFile = Path.of("/tmp/cassandra.out");
+        Path stderrFile = Path.of("/tmp/cassandra.err");
         ProcessBuilder pb = config.buildStartCommand(pidFile, stdoutFile, stderrFile);
 
         // Verify JVM options are included (order may vary)
@@ -306,5 +330,14 @@ class ProcessRuntimeConfigurationTest
         Map<String, String> env = pb.environment();
         assertThat(env.get("JVM_OPTS")).isEqualTo("-Xms1G -Xmx2G");
         assertThat(env.get("CUSTOM_VAR")).isEqualTo("custom_value");
+    }
+
+    InstanceMetadata instanceMetadata()
+    {
+        return InstanceMetadataImpl.builder()
+                                   .id(1)
+                                   .metricRegistry(METRIC_REGISTRY)
+                                   .storageDir("/tmp/storage_dir")
+                                   .build();
     }
 }

@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
  */
 public class TestFileUtils
 {
-    protected static final Logger LOG = LoggerFactory.getLogger(TestFileUtils.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(TestFileUtils.class);
 
     public static void extractGzippedTarball(Path tarballPath, Path targetDir) throws IOException
     {
@@ -50,7 +50,7 @@ public class TestFileUtils
         {
             throw new IllegalStateException("Cassandra tarball does not exist or is not a .tar.gz file: " + tarballPath);
         }
-        LOG.info("Extracting tarball {} to directory {}", tarballPath, targetDir);
+        LOGGER.info("Extracting tarball {} to directory {}", tarballPath, targetDir);
         try (TarArchiveInputStream tarInput = new TarArchiveInputStream(new GzipCompressorInputStream(Files.newInputStream(tarballPath))))
         {
             TarArchiveEntry entry;
@@ -72,12 +72,12 @@ public class TestFileUtils
                 }
             }
         }
-        LOG.info("Extracted tarball {} to directory {}", tarballPath, targetDir);
+        LOGGER.info("Extracted tarball {} to directory {}", tarballPath, targetDir);
     }
 
     public static void copyDirectoryRecursively(Path sourceDir, Path targetDir) throws IOException
     {
-        LOG.info("Copying directory {} to {}", sourceDir, targetDir);
+        LOGGER.info("Copying directory {} to {}", sourceDir, targetDir);
         try (var walk = Files.walk(sourceDir))
         {
             walk.forEach(source ->
@@ -106,7 +106,7 @@ public class TestFileUtils
     public static void replacePlaceholdersInFileWithPattern(Path templateFile, Map<String, String> placeholders,
                                                             Path destFile) throws IOException
     {
-        LOG.info("Replacing placeholders {} in file {}", placeholders.keySet(), templateFile);
+        LOGGER.info("Replacing placeholders {} in file {}", placeholders.keySet(), templateFile);
         String content = Files.readString(templateFile);
         for (Map.Entry<String, String> entry : placeholders.entrySet())
         {
@@ -114,7 +114,7 @@ public class TestFileUtils
             content = content.replaceAll(placeholder, Matcher.quoteReplacement(entry.getValue()));
         }
         Files.writeString(destFile, content, StandardOpenOption.CREATE_NEW);
-        LOG.info("Replaced {} placeholders in file {} and writing to {}", placeholders.size(), templateFile, destFile);
+        LOGGER.info("Replaced {} placeholders in file {} and writing to {}", placeholders.size(), templateFile, destFile);
     }
 
     public static Set<PosixFilePermission> permissionsFromInteger(int mode)

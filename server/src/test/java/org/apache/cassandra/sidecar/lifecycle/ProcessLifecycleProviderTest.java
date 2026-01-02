@@ -31,12 +31,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import com.codahale.metrics.MetricRegistry;
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
+import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadataImpl;
 import org.apache.cassandra.sidecar.exceptions.ConfigurationException;
 import org.mockito.MockedStatic;
 
-import static org.apache.cassandra.sidecar.lifecycle.ProcessLifecycleProvider.getPidFileLocation;
+import static org.apache.cassandra.sidecar.lifecycle.ProcessLifecycleProvider.pidFileLocation;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatRuntimeException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -51,6 +54,8 @@ import static org.mockito.Mockito.when;
  */
 public class ProcessLifecycleProviderTest
 {
+    private static final MetricRegistry METRIC_REGISTRY = new MetricRegistry();
+
     @TempDir
     Path lifecycleStateDir;
 
@@ -84,7 +89,7 @@ public class ProcessLifecycleProviderTest
 
                 ProcessBuilder startMock = mock(ProcessBuilder.class);
                 when(startMock.start()).then(invocation -> {
-                    String pidFileLocation = getPidFileLocation(lifecycleStateDir.toString(), "localhost");
+                    String pidFileLocation = pidFileLocation(lifecycleStateDir.toString(), instance.id());
                     // create the pid file to simulate a started process
                     Path pidFile = Path.of(pidFileLocation);
                     Files.writeString(pidFile, "12345");
@@ -92,7 +97,8 @@ public class ProcessLifecycleProviderTest
                 });
                 ProcessRuntimeConfiguration mockConfig = mock(ProcessRuntimeConfiguration.class);
                 when(mockConfig.buildStartCommand(any(), any(), any())).thenReturn(startMock);
-                when(mockConfig.instanceName()).thenReturn("localhost");
+
+                when(mockConfig.instance()).thenReturn(instance);
                 return mockConfig;
             }
             catch (InterruptedException | IOException e)
@@ -103,7 +109,7 @@ public class ProcessLifecycleProviderTest
     }
 
     @Test
-    void testStartStopIsRunning() throws InterruptedException
+    void testStartStopIsRunning()
     {
         try (MockedStatic<ProcessHandle> processHandleMock = mockStatic(ProcessHandle.class))
         {
@@ -126,14 +132,10 @@ public class ProcessLifecycleProviderTest
             );
             FakeProcessLifecycleProvider provider = new FakeProcessLifecycleProvider(params);
 
-            // Create mock instance metadata
-            InstanceMetadata instance = mock(InstanceMetadata.class);
-            when(instance.host()).thenReturn("localhost");
-            when(instance.storageDir()).thenReturn("/custom/storage/dir");
-            when(instance.lifecycleOptions()).thenReturn(Map.of());
+            InstanceMetadata instance = instanceMetadata(1);
 
             // Initially, instance should not be running (no PID file exists)
-            String pidFileLocation = getPidFileLocation(lifecycleStateDir.toString(), "localhost");
+            String pidFileLocation = pidFileLocation(lifecycleStateDir.toString(), instance.id());
             Path pidFilePath = Path.of(pidFileLocation);
             assertThat(pidFilePath).doesNotExist();
             assertThat(provider.isRunning(instance)).isFalse();
@@ -164,22 +166,18 @@ public class ProcessLifecycleProviderTest
 
         ProcessLifecycleProvider provider = new ProcessLifecycleProvider(params);
 
-        // Create mock instance metadata
-        InstanceMetadata instance = mock(InstanceMetadata.class);
-        when(instance.host()).thenReturn("localhost");
-        when(instance.storageDir()).thenReturn("/custom/storage/dir");
-
         Map<String, String> lifecycleOptions = Map.of(
         ProcessLifecycleProvider.OPT_CASSANDRA_HOME, "/instance/cassandra/home",
         ProcessLifecycleProvider.OPT_CASSANDRA_CONF_DIR, "/instance/conf/dir",
         ProcessLifecycleProvider.OPT_CASSANDRA_LOG_DIR, "/instance/log/dir"
         );
-        when(instance.lifecycleOptions()).thenReturn(lifecycleOptions);
+
+        InstanceMetadata instance = instanceMetadata(1, lifecycleOptions);
 
         ProcessRuntimeConfiguration config = provider.getRuntimeConfiguration(instance);
 
         // Verify the configuration was built correctly
-        assertThat(config.instanceName()).isEqualTo("localhost");
+        assertThat(config.instance()).isEqualTo(instance);
         assertThat(config.cassandraHome()).isEqualTo(Path.of("/instance/cassandra/home"));
         assertThat(config.cassandraConfDir).isEqualTo(Path.of("/instance/conf/dir"));
         assertThat(config.cassandraLogDir).isEqualTo("/instance/log/dir");
@@ -196,18 +194,13 @@ public class ProcessLifecycleProviderTest
 
         ProcessLifecycleProvider provider = new ProcessLifecycleProvider(params);
 
-        // Create mock instance metadata
-        InstanceMetadata instance = mock(InstanceMetadata.class);
-        when(instance.host()).thenReturn("localhost");
-        when(instance.storageDir()).thenReturn("/custom/storage/dir");
-
         // Lifecycle options without CASSANDRA_HOME override
         Map<String, String> lifecycleOptions = Map.of(
         ProcessLifecycleProvider.OPT_CASSANDRA_CONF_DIR, "/instance/conf/dir",
         ProcessLifecycleProvider.OPT_CASSANDRA_LOG_DIR, "/instance/log/dir"
         );
-        when(instance.lifecycleOptions()).thenReturn(lifecycleOptions);
 
+        InstanceMetadata instance = instanceMetadata(1, lifecycleOptions);
         ProcessRuntimeConfiguration config = provider.getRuntimeConfiguration(instance);
 
         // Verify the configuration uses default Cassandra home
@@ -240,7 +233,7 @@ public class ProcessLifecycleProviderTest
 
         // Create mock instance metadata without storage dir
         InstanceMetadata instance = mock(InstanceMetadata.class);
-        when(instance.host()).thenReturn("testhost");
+        when(instance.id()).thenReturn(5);
         when(instance.storageDir()).thenReturn(null);
 
         Map<String, String> lifecycleOptions = Map.of(
@@ -250,9 +243,9 @@ public class ProcessLifecycleProviderTest
 
         // Build the config and test the start command using provider helper methods
         ProcessRuntimeConfiguration testConfig = provider.getRuntimeConfiguration(instance);
-        String pidFileLocation = provider.getPidFileLocation("testhost");
-        String stdoutLocation = provider.getStdoutLocation("testhost");
-        String stderrLocation = provider.getStderrLocation("testhost");
+        String pidFileLocation = provider.pidFileLocation(instance);
+        Path stdoutLocation = provider.stdoutLocation(instance);
+        Path stderrLocation = provider.stderrLocation(instance);
 
         ProcessBuilder processBuilder = testConfig.buildStartCommand(pidFileLocation, stdoutLocation, stderrLocation);
 
@@ -291,28 +284,25 @@ public class ProcessLifecycleProviderTest
         Map<String, String> params = Map.of(
         ProcessLifecycleProvider.OPT_STATE_DIR, lifecycleStateDir.toString(),
         ProcessLifecycleProvider.OPT_CASSANDRA_HOME, tempCassandraHome.toString(),
-        "cassandra.max_queued_native_transport_requests", "1024",
+        "sys.cassandra.max_queued_native_transport_requests", "1024",
         "env.JVM_OPTS", "-Xms1G -Xmx2G",
         "env.CUSTOM_VAR", "custom_value"
         );
 
         ProcessLifecycleProvider provider = new ProcessLifecycleProvider(params);
 
-        // Create mock instance metadata
-        InstanceMetadata instance = mock(InstanceMetadata.class);
-        when(instance.host()).thenReturn("testhost");
-        when(instance.storageDir()).thenReturn(null);
-
         Map<String, String> lifecycleOptions = Map.of(
         ProcessLifecycleProvider.OPT_CASSANDRA_CONF_DIR, tempConfDir.toString()
         );
-        when(instance.lifecycleOptions()).thenReturn(lifecycleOptions);
+
+        InstanceMetadata instance = instanceMetadata(5, lifecycleOptions);
 
         // Build the config and test the start command
         ProcessRuntimeConfiguration testConfig = provider.getRuntimeConfiguration(instance);
-        String pidFileLocation = provider.getPidFileLocation("testhost");
-        String stdoutLocation = provider.getStdoutLocation("testhost");
-        String stderrLocation = provider.getStderrLocation("testhost");
+        InstanceMetadata instanceMetadata = instanceMetadata(5);
+        String pidFileLocation = provider.pidFileLocation(instanceMetadata);
+        Path stdoutLocation = provider.stdoutLocation(instanceMetadata);
+        Path stderrLocation = provider.stderrLocation(instanceMetadata);
 
         ProcessBuilder processBuilder = testConfig.buildStartCommand(pidFileLocation, stdoutLocation, stderrLocation);
 
@@ -345,12 +335,12 @@ public class ProcessLifecycleProviderTest
 
             // Create mock instance metadata
             InstanceMetadata instance = mock(InstanceMetadata.class);
-            when(instance.host()).thenReturn("localhost");
+            when(instance.id()).thenReturn(1);
             when(instance.storageDir()).thenReturn("/storage/dir");
             when(instance.lifecycleOptions()).thenReturn(Map.of());
 
             // Create a PID file with a stale PID (process that doesn't exist)
-            String pidFileLocation = getPidFileLocation(lifecycleStateDir.toString(), "localhost");
+            String pidFileLocation = pidFileLocation(lifecycleStateDir.toString(), 1);
             Path pidFilePath = Path.of(pidFileLocation);
             Files.writeString(pidFilePath, "99999");
 
@@ -386,12 +376,12 @@ public class ProcessLifecycleProviderTest
 
             // Create mock instance metadata
             InstanceMetadata instance = mock(InstanceMetadata.class);
-            when(instance.host()).thenReturn("localhost");
+            when(instance.id()).thenReturn(1);
             when(instance.storageDir()).thenReturn("/storage/dir");
             when(instance.lifecycleOptions()).thenReturn(Map.of());
 
             // Create a PID file with a PID
-            String pidFileLocation = getPidFileLocation(lifecycleStateDir.toString(), "localhost");
+            String pidFileLocation = pidFileLocation(lifecycleStateDir.toString(), 1);
             Path pidFilePath = Path.of(pidFileLocation);
             Files.writeString(pidFilePath, "55555");
 
@@ -434,12 +424,12 @@ public class ProcessLifecycleProviderTest
 
             // Create mock instance metadata
             InstanceMetadata instance = mock(InstanceMetadata.class);
-            when(instance.host()).thenReturn("localhost");
+            when(instance.id()).thenReturn(1);
             when(instance.storageDir()).thenReturn("/storage/dir");
             when(instance.lifecycleOptions()).thenReturn(Map.of());
 
             // Create a PID file with a valid Cassandra process PID
-            String pidFileLocation = getPidFileLocation(lifecycleStateDir.toString(), "localhost");
+            String pidFileLocation = pidFileLocation(lifecycleStateDir.toString(), 1);
             Path pidFilePath = Path.of(pidFileLocation);
             Files.writeString(pidFilePath, "77777");
 
@@ -517,29 +507,16 @@ public class ProcessLifecycleProviderTest
     }
 
     @Test
-    void testReadPidFromFileThrowsExceptionForInvalidPid()
+    void testReadPidFromFileThrowsExceptionForInvalidPid() throws IOException
     {
         // Create a PID file with invalid content
         Path pidFilePath = lifecycleStateDir.resolve("test.pid");
         assertThat(pidFilePath).doesNotExist();
+        Files.writeString(pidFilePath, "invalid_pid");
 
-        try
-        {
-            Files.writeString(pidFilePath, "invalid_pid");
-            ProcessLifecycleProvider.readPidFromFile(pidFilePath);
-            
-            // Should not reach here
-            assertThat(false).as("Expected RuntimeException to be thrown").isTrue();
-        }
-        catch (RuntimeException e)
-        {
-            assertThat(e.getMessage()).contains("Failed to read PID from file");
-            assertThat(e.getCause()).isInstanceOf(NumberFormatException.class);
-        }
-        catch (IOException e)
-        {
-            throw new RuntimeException(e);
-        }
+        assertThatRuntimeException().isThrownBy(() -> ProcessLifecycleProvider.readPidFromFile(pidFilePath))
+                                    .withCauseInstanceOf(NumberFormatException.class)
+                                    .withMessageContaining("Unable to parse PID from file: ");
     }
 
     @Test
@@ -551,7 +528,7 @@ public class ProcessLifecycleProviderTest
         try
         {
             ProcessLifecycleProvider.readPidFromFile(pidFilePath);
-            
+
             // Should not reach here
             assertThat(false).as("Expected RuntimeException to be thrown").isTrue();
         }
@@ -615,14 +592,10 @@ public class ProcessLifecycleProviderTest
             );
             FakeProcessLifecycleProvider provider = new FakeProcessLifecycleProvider(params);
 
-            // Create mock instance metadata
-            InstanceMetadata instance = mock(InstanceMetadata.class);
-            when(instance.host()).thenReturn("localhost");
-            when(instance.storageDir()).thenReturn("/storage/dir");
-            when(instance.lifecycleOptions()).thenReturn(Map.of());
+            InstanceMetadata instance = instanceMetadata(1);
 
             // Create a PID file
-            String pidFileLocation = getPidFileLocation(lifecycleStateDir.toString(), "localhost");
+            String pidFileLocation = pidFileLocation(lifecycleStateDir.toString(), 1);
             Path pidFilePath = Path.of(pidFileLocation);
             Files.writeString(pidFilePath, "12345");
 
@@ -667,12 +640,12 @@ public class ProcessLifecycleProviderTest
 
             // Create mock instance metadata
             InstanceMetadata instance = mock(InstanceMetadata.class);
-            when(instance.host()).thenReturn("localhost");
+            when(instance.id()).thenReturn(1);
             when(instance.storageDir()).thenReturn("/storage/dir");
             when(instance.lifecycleOptions()).thenReturn(Map.of());
 
             // Create a PID file
-            String pidFileLocation = getPidFileLocation(lifecycleStateDir.toString(), "localhost");
+            String pidFileLocation = pidFileLocation(lifecycleStateDir.toString(), 1);
             Path pidFilePath = Path.of(pidFileLocation);
             Files.writeString(pidFilePath, "12345");
 
@@ -697,8 +670,8 @@ public class ProcessLifecycleProviderTest
 
             // Call stop - should throw exception because destroyForcibly returned false
             assertThatThrownBy(() -> provider.stop(instance))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Failed to forcibly destroy process");
+            .isInstanceOf(RuntimeException.class)
+            .hasMessageContaining("Failed to forcibly destroy process");
         }
     }
 
@@ -711,9 +684,9 @@ public class ProcessLifecycleProviderTest
         );
 
         assertThatThrownBy(() -> new ProcessLifecycleProvider(params))
-            .isInstanceOf(ConfigurationException.class)
-            .hasMessageContaining("State directory")
-            .hasMessageContaining("does not exist or is not a directory");
+        .isInstanceOf(ConfigurationException.class)
+        .hasMessageContaining("State directory")
+        .hasMessageContaining("does not exist or is not a directory");
     }
 
     @Test
@@ -725,8 +698,23 @@ public class ProcessLifecycleProviderTest
         );
 
         assertThatThrownBy(() -> new ProcessLifecycleProvider(params))
-            .isInstanceOf(ConfigurationException.class)
-            .hasMessageContaining("Cassandra home")
-            .hasMessageContaining("does not exist or is not a directory");
+        .isInstanceOf(ConfigurationException.class)
+        .hasMessageContaining("Cassandra home")
+        .hasMessageContaining("does not exist or is not a directory");
+    }
+
+    InstanceMetadata instanceMetadata(int instanceId)
+    {
+        return instanceMetadata(instanceId, Map.of());
+    }
+
+    InstanceMetadata instanceMetadata(int instanceId, Map<String, String> lifecycleOptions)
+    {
+        return InstanceMetadataImpl.builder()
+                                   .id(instanceId)
+                                   .metricRegistry(METRIC_REGISTRY)
+                                   .storageDir("/custom/storage/dir")
+                                   .lifecycleOptions(lifecycleOptions)
+                                   .build();
     }
 }

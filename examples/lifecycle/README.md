@@ -38,7 +38,7 @@ $ ./setup.sh
 Once executed, the script should create the following directory structure, simulating a Cassandra host install:
 
 ```shell
-$ls -l nodes/localhost/*
+$ ls -l nodes/localhost/
 nodes/localhost/etc:
 total 4
 drwxr-xr-x 3 paulo paulo 4096 Aug 29 16:58 cassandra
@@ -77,11 +77,11 @@ Use the following command to check that the Cassandra instance is not running an
 
 ```shell
 # Check lifecycle state
-$curl localhost:9043/api/v1/cassandra/lifecycle
+$ curl localhost:9043/api/v1/cassandra/lifecycle
 {"current_state":"STOPPED","desired_state":"UNKNOWN","status":"UNDEFINED","last_update":"No lifecycle task submitted for this instance yet."}
 
 # Check CQL State
-$curl localhost:9043/api/v1/cassandra/native/__health
+$ curl localhost:9043/api/v1/cassandra/native/__health
 {"status":"NOT_OK"}
 ```
 
@@ -90,11 +90,11 @@ $curl localhost:9043/api/v1/cassandra/native/__health
 Now let's try to start Cassandra:
 
 ```shell
- $curl -XPUT http://localhost:9043/api/v1/cassandra/lifecycle -d'{"state": "start"}'
+$ curl -XPUT http://localhost:9043/api/v1/cassandra/lifecycle -d'{"state": "start"}'
 {"current_state":"STOPPED","desired_state":"RUNNING","status":"CONVERGING","last_update":"Submitting start task for instance"}
 ```
 
-If you see an error during this step, check the logs at `examples/lifecycle/nodes/localhost/var/lib/cassandra-sidecar/lifecycle/cassandra-localhost.out` (and corresponding `cassandra-localhost.err` file).
+If you see an error during this step, check the logs at `examples/lifecycle/nodes/localhost/var/lib/cassandra-sidecar/lifecycle/start-cassandra-1.out` (and corresponding `start-cassandra-1.err` file).
 
 Query the lifecycle status until the instance is started:
 ```shell
@@ -105,7 +105,7 @@ $ curl localhost:9043/api/v1/cassandra/lifecycle
 Query the CQL status until it's started. This might take some time since as the Cassandra process initializes.
 
 ```shell
-curl localhost:9043/api/v1/cassandra/native/__health
+$ curl localhost:9043/api/v1/cassandra/native/__health
 {"status":"OK"}
 ```
 You should see the following in the sidecar logs, indicating the Cassandra instance is started, and it's able to connect to it via CQL and JMX:
@@ -127,17 +127,17 @@ Check that the Cassandra process ID matches the PID in the lifecycle process ID 
 ```shell
 $ ps aux | grep CassandraDaemon | grep -v grep | awk '{ print $2 }'
 8821
-$ cat nodes/localhost/var/lib/cassandra-sidecar/lifecycle/cassandra-localhost.pid
+$ cat nodes/localhost/var/lib/cassandra-sidecar/lifecycle/cassandra-1.pid
 8821
 ```
 
-At this stage, you may explore the cassandra logs at `examples/lifecycle/nodes/localhost/var/logs/cassandra/system.log` or cassandra startup logs at `examples/lifecycle/nodes/localhost/var/lib/cassandra-sidecar/cassandra-localhost.out`.
+At this stage, you may explore the cassandra logs at `examples/lifecycle/nodes/localhost/var/log/cassandra/system.log` or cassandra startup logs at `examples/lifecycle/nodes/localhost/var/lib/cassandra-sidecar/lifecycle/start-cassandra-1.out`.
 
 ## Stopping Cassandra via sidecar
 
 Stop Cassandra via sidecar with the following command:
 ```shell
-curl -XPUT http://localhost:9043/api/v1/cassandra/lifecycle -d'{"state": "stop"}'
+$ curl -XPUT http://localhost:9043/api/v1/cassandra/lifecycle -d'{"state": "stop"}'
 {"current_state":"RUNNING","desired_state":"STOPPED","status":"CONVERGING","last_update":"Submitting stop task for instance"}
 ```
 

@@ -68,7 +68,11 @@ cassandra_instances:
 #    jmx_role_password:
     lifecycle_options:
       cassandra_conf_dir: /etc/cassandra
-#     cassandra_log_dir: /var/log/cassandra
+      #cassandra_log_dir: /var/log/cassandra
+      # Optional configuration for the cassandra YAML configuration file location.
+      # When not specified the configuration file will resolve to
+      # <lifecycle_options.cassandra_conf_dir>/cassandra.yaml
+      #cassandra_yaml_path: /etc/cassandra/cassandra.yaml
 
 sidecar:
   host: 0.0.0.0
