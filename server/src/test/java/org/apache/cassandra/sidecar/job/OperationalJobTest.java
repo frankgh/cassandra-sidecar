@@ -123,7 +123,12 @@ class OperationalJobTest
 
     public static OperationalJob createOperationalJob(UUID jobId, DurationSpec jobDuration, OperationalJobException jobFailure)
     {
-        return new OperationalJob(jobId)
+        return createOperationalJob(jobId, null, jobDuration, jobFailure);
+    }
+
+    public static OperationalJob createOperationalJob(UUID jobId, UUID nodeId, DurationSpec jobDuration, OperationalJobException jobFailure)
+    {
+        return new OperationalJob(jobId, nodeId)
         {
             @Override
             public boolean hasConflict(List<OperationalJob> jobs)
@@ -170,6 +175,7 @@ class OperationalJobTest
         assertThat(future.succeeded()).isTrue();
         assertThat(job.asyncResult().succeeded()).isTrue();
         assertThat(job.status()).isEqualTo(OperationalJobStatus.SUCCEEDED);
+        assertThat(job.lastUpdate()).contains("completed");
     }
 
     @Test
@@ -204,6 +210,7 @@ class OperationalJobTest
         assertThat(failingJob.asyncResult().cause())
         .isExactlyInstanceOf(OperationalJobException.class)
         .hasMessage(msg);
+        assertThat(failingJob.lastUpdate()).contains("failed");
     }
 
     @Test
@@ -244,5 +251,69 @@ class OperationalJobTest
             assertThat(result.succeeded()).isTrue();
             assertThat(longRunning.isExecuting()).isTrue();
         });
+    }
+
+    @Test
+    void testNodeListsEmptyWhenNoNodeId()
+    {
+        OperationalJob job = createOperationalJob(OperationalJobStatus.CREATED);
+        assertThat(job.nodeId()).isNull();
+        assertThat(job.nodesPending()).isEmpty();
+        assertThat(job.nodesExecuting()).isEmpty();
+        assertThat(job.nodesSucceeded()).isEmpty();
+        assertThat(job.nodesFailed()).isEmpty();
+    }
+
+    @Test
+    void testNodeListsInitializedWhenNodeIdProvided()
+    {
+        UUID nodeId = UUID.randomUUID();
+        OperationalJob job = createOperationalJob(UUIDs.timeBased(), nodeId, null, null);
+        assertThat(job.nodeId()).isEqualTo(nodeId);
+        assertThat(job.nodesPending()).containsExactly(nodeId);
+        assertThat(job.nodesExecuting()).isEmpty();
+        assertThat(job.nodesSucceeded()).isEmpty();
+        assertThat(job.nodesFailed()).isEmpty();
+    }
+
+    @Test
+    void testNodeListsTransitionOnSuccess()
+    {
+        UUID nodeId = UUID.randomUUID();
+        OperationalJob job = createOperationalJob(UUIDs.timeBased(), nodeId,
+                                                  MillisecondBoundConfiguration.parse("10ms"), null);
+        job.execute(Promise.promise());
+
+        assertThat(job.nodesPending()).isEmpty();
+        assertThat(job.nodesExecuting()).isEmpty();
+        assertThat(job.nodesSucceeded()).containsExactly(nodeId);
+        assertThat(job.nodesFailed()).isEmpty();
+    }
+
+    @Test
+    void testNodeListsTransitionOnFailure()
+    {
+        UUID nodeId = UUID.randomUUID();
+        OperationalJobException failure = new OperationalJobException("test failure");
+        OperationalJob job = createOperationalJob(UUIDs.timeBased(), nodeId,
+                                                  null, failure);
+        job.execute(Promise.promise());
+
+        assertThat(job.nodesPending()).isEmpty();
+        assertThat(job.nodesExecuting()).isEmpty();
+        assertThat(job.nodesSucceeded()).isEmpty();
+        assertThat(job.nodesFailed()).containsExactly(nodeId);
+    }
+
+    @Test
+    void testStartTimeIsSetWhenJobStarts()
+    {
+        OperationalJob job = createOperationalJob(UUIDs.timeBased(),
+                                                  MillisecondBoundConfiguration.parse("10ms"));
+        long before = System.currentTimeMillis();
+        job.execute(Promise.promise());
+        long after = System.currentTimeMillis();
+
+        assertThat(job.startTime()).isBetween(before, after);
     }
 }

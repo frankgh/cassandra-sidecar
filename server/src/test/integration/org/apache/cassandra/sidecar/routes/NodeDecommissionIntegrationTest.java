@@ -42,7 +42,7 @@ import static org.apache.cassandra.sidecar.common.data.OperationalJobStatus.FAIL
 import static org.apache.cassandra.sidecar.common.data.OperationalJobStatus.RUNNING;
 import static org.apache.cassandra.sidecar.common.data.OperationalJobStatus.SUCCEEDED;
 import static org.apache.cassandra.testing.utils.AssertionUtils.loopAssert;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test the node decommission endpoint with cassandra container.
@@ -54,16 +54,18 @@ public class NodeDecommissionIntegrationTest extends IntegrationTestBase
     void decommissionNodeDefault(VertxTestContext context)
     {
         final AtomicReference<String> jobId = new AtomicReference<>();
+        final AtomicReference<UUID> expectedNodeId = new AtomicReference<>();
         String testRoute = "/api/v1/cassandra/operations/decommission?force=true";
         testWithClient(client -> client.put(server.actualPort(), "127.0.0.1", testRoute)
                                        .send(context.succeeding(response -> {
                                            OperationalJobResponse decommissionResponse = response.bodyAsJson(OperationalJobResponse.class);
                                            assertThat(decommissionResponse.status()).isEqualTo(RUNNING);
                                            jobId.set(String.valueOf(decommissionResponse.jobId()));
+                                           expectedNodeId.set(decommissionResponse.nodesExecuting().get(0));
                                        })));
         Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
         assertThat(jobId.get()).isNotNull();
-        pollStatusForState(jobId.get(), SUCCEEDED, null);
+        pollStatusForState(jobId.get(), SUCCEEDED, null, expectedNodeId.get());
         context.completeNow();
     }
 
@@ -84,7 +86,8 @@ public class NodeDecommissionIntegrationTest extends IntegrationTestBase
 
     private void pollStatusForState(String uuid,
                                     OperationalJobStatus expectedStatus,
-                                    String expectedReason)
+                                    String expectedReason,
+                                    UUID expectedNodeId)
     {
         String status = "/api/v1/cassandra/operational-jobs/" + uuid;
         AtomicBoolean stateReached = new AtomicBoolean(false);
@@ -110,12 +113,31 @@ public class NodeDecommissionIntegrationTest extends IntegrationTestBase
                     assertThat(jobStatusResp.status()).isEqualTo(expectedStatus);
                     assertThat(jobStatusResp.reason()).isEqualTo(expectedReason);
                     assertThat(jobStatusResp.operation()).isEqualTo("decommission");
+                    assertThat(jobStatusResp.startTime()).isNotNull();
+                    assertThat(jobStatusResp.nodesPending()).isEmpty();
+                    assertThat(jobStatusResp.nodesExecuting()).isEmpty();
+                    if (expectedStatus == SUCCEEDED)
+                    {
+                        assertThat(jobStatusResp.lastUpdate()).contains("completed");
+                        assertThat(jobStatusResp.nodesSucceeded()).containsExactly(expectedNodeId);
+                        assertThat(jobStatusResp.nodesFailed()).isEmpty();
+                    }
+                    else if (expectedStatus == FAILED)
+                    {
+                        assertThat(jobStatusResp.lastUpdate()).contains("failed");
+                        assertThat(jobStatusResp.nodesSucceeded()).isEmpty();
+                        assertThat(jobStatusResp.nodesFailed()).containsExactly(expectedNodeId);
+                    }
                 }
                 else
                 {
                     assertThat(resp.statusCode()).isEqualTo(HttpResponseStatus.ACCEPTED.code());
                     OperationalJobResponse jobStatusResp = resp.bodyAsJson(OperationalJobResponse.class);
                     assertThat(jobStatusResp.jobId()).isEqualTo(UUID.fromString(uuid));
+                    assertThat(jobStatusResp.nodesPending()).isEmpty();
+                    assertThat(jobStatusResp.nodesExecuting()).containsExactly(expectedNodeId);
+                    assertThat(jobStatusResp.nodesSucceeded()).isEmpty();
+                    assertThat(jobStatusResp.nodesFailed()).isEmpty();
                 }
                 logger.info("Request completed");
                 assertThat(stateReached.get()).isTrue();

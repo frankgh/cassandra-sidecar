@@ -71,6 +71,8 @@ public class CassandraNodeOperationsIntegrationTest extends SharedClusterSidecar
     @Test
     void testNodeDrainOperationSuccess()
     {
+        String expectedHostId = getRingEntryForNode("localhost").hostId();
+
         // Initiate drain operation
         HttpResponse<Buffer> drainResponse = getBlocking(
         trustedClient().put(serverWrapper.serverPort, "localhost", ApiEndpointsV1.NODE_DRAIN_ROUTE)
@@ -102,7 +104,7 @@ public class CassandraNodeOperationsIntegrationTest extends SharedClusterSidecar
 
         // Validate the operational job status using the OperationalJobHandler
         String jobId = responseBody.getString("jobId");
-        validateOperationalJobStatus(jobId, "drain", OperationalJobStatus.SUCCEEDED);
+        validateOperationalJobStatus(jobId, "drain", OperationalJobStatus.SUCCEEDED, expectedHostId);
     }
 
 
@@ -114,7 +116,7 @@ public class CassandraNodeOperationsIntegrationTest extends SharedClusterSidecar
         String requestBody = "{\"newToken\":\"" + testToken + "\"}";
 
         // Validate that the node owns a different token than testToken
-        String currentToken = getCurrentTokenForNode("localhost");
+        String currentToken = getRingEntryForNode("localhost").token();
         assertThat(currentToken).isNotEqualTo(testToken);
 
         // Initiate move operation
@@ -151,10 +153,11 @@ public class CassandraNodeOperationsIntegrationTest extends SharedClusterSidecar
 
         // Validate the operational job status using the OperationalJobHandler
         String jobId = responseBody.getString("jobId");
-        validateOperationalJobStatus(jobId, "move", OperationalJobStatus.SUCCEEDED);
+        String expectedHostId = getRingEntryForNode("localhost").hostId();
+        validateOperationalJobStatus(jobId, "move", OperationalJobStatus.SUCCEEDED, expectedHostId);
 
         // Validate that the node actually owns the new token
-        currentToken = getCurrentTokenForNode("localhost");
+        currentToken = getRingEntryForNode("localhost").token();
         assertThat(currentToken).isEqualTo(testToken);
     }
 
@@ -175,11 +178,11 @@ public class CassandraNodeOperationsIntegrationTest extends SharedClusterSidecar
     void testNodeMoveOperationFailure()
     {
         // Get a token already owned by a node
-        String testToken = getCurrentTokenForNode("localhost2");
+        String testToken = getRingEntryForNode("localhost2").token();
         String requestBody = "{\"newToken\":\"" + testToken + "\"}";
 
         // Validate that the node owns a different token than testToken
-        String initialToken = getCurrentTokenForNode("localhost");
+        String initialToken = getRingEntryForNode("localhost").token();
         assertThat(initialToken).isNotEqualTo(testToken);
 
         // Initiate move operation
@@ -216,36 +219,32 @@ public class CassandraNodeOperationsIntegrationTest extends SharedClusterSidecar
 
         // Validate the operational job status using the OperationalJobHandler
         String jobId = responseBody.getString("jobId");
-        validateOperationalJobStatus(jobId, "move", OperationalJobStatus.FAILED);
+        String expectedHostId = getRingEntryForNode("localhost").hostId();
+        validateOperationalJobStatus(jobId, "move", OperationalJobStatus.FAILED, expectedHostId);
 
         // Validate that the node didn't move
-        String currentToken = getCurrentTokenForNode("localhost");
+        String currentToken = getRingEntryForNode("localhost").token();
         assertThat(currentToken).isEqualTo(initialToken);
         assertThat(currentToken).isNotEqualTo(testToken);
     }
 
     /**
-     * Gets the current token for the specified node by querying the ring endpoint.
+     * Gets the ring entry for the specified node by querying the ring endpoint.
      *
-     * @param node the node hostname to get the token for
-     * @return the token currently owned by the specified node
+     * @param node the node hostname to look up
+     * @return the {@link RingEntry} for the specified node
      */
-    private String getCurrentTokenForNode(String node)
+    private RingEntry getRingEntryForNode(String node)
     {
         HttpResponse<Buffer> ringResponse = getBlocking(
         trustedClient().get(serverWrapper.serverPort, node, ApiEndpointsV1.RING_ROUTE)
                        .send());
 
-        assertThat(ringResponse.statusCode()).isEqualTo(OK.code());
-
         RingResponse ring = ringResponse.bodyAsJson(RingResponse.class);
-        assertThat(ring).isNotNull();
-
-        RingEntry ringEntry = ring.stream()
-                                  .filter(entry -> entry.fqdn().equals(node))
-                                  .findFirst()
-                                  .orElseThrow(() -> new AssertionError("Node " + node + " not found in ring"));
-        return ringEntry.token();
+        return ring.stream()
+                   .filter(entry -> entry.fqdn().equals(node))
+                   .findFirst()
+                   .orElseThrow(() -> new AssertionError("Node " + node + " not found in ring"));
     }
 
     /**
@@ -254,8 +253,11 @@ public class CassandraNodeOperationsIntegrationTest extends SharedClusterSidecar
      *
      * @param jobId             the ID of the operational job to validate
      * @param expectedOperation the expected operation name (e.g., "move", "decommission", "drain")
+     * @param expectedEndStatus the expected final status of the job
+     * @param expectedHostId    the expected Cassandra host ID in the node tracking lists
      */
-    private void validateOperationalJobStatus(String jobId, String expectedOperation, OperationalJobStatus expectedEndStatus)
+    private void validateOperationalJobStatus(String jobId, String expectedOperation,
+                                              OperationalJobStatus expectedEndStatus, String expectedHostId)
     {
         String operationalJobRoute = ApiEndpointsV1.OPERATIONAL_JOB_ROUTE.replace(":operationId", jobId);
 
@@ -270,9 +272,14 @@ public class CassandraNodeOperationsIntegrationTest extends SharedClusterSidecar
         assertThat(jobStatusBody.getString("jobId")).isEqualTo(jobId);
         assertThat(jobStatusBody.getString("operation")).isEqualTo(expectedOperation);
 
-        // If the job is still running, wait for it to complete or reach a final state
+        // If the job is still running, verify node tracking lists reflect the executing state
         if (OperationalJobStatus.RUNNING.name().equals(jobStatusBody.getString("jobStatus")))
         {
+            assertThat(jobStatusBody.getJsonArray("nodesPending")).isEmpty();
+            assertThat(jobStatusBody.getJsonArray("nodesExecuting")).containsExactly(expectedHostId);
+            assertThat(jobStatusBody.getJsonArray("nodesSucceeded")).isEmpty();
+            assertThat(jobStatusBody.getJsonArray("nodesFailed")).isEmpty();
+
             loopAssert(30, 500, () -> {
                 HttpResponse<Buffer> finalJobStatusResponse = getBlocking(
                 trustedClient().get(serverWrapper.serverPort, "localhost", operationalJobRoute)
@@ -300,6 +307,21 @@ public class CassandraNodeOperationsIntegrationTest extends SharedClusterSidecar
         assertThat(jobStatusBody.getString("jobId")).isEqualTo(jobId);
         assertThat(jobStatusBody.getString("operation")).isEqualTo(expectedOperation);
         assertThat(jobStatusBody.getString("jobStatus")).isEqualTo(expectedEndStatus.name());
+        assertThat(jobStatusBody.getString("startTime")).isNotNull();
+        assertThat(jobStatusBody.getJsonArray("nodesPending")).isEmpty();
+        assertThat(jobStatusBody.getJsonArray("nodesExecuting")).isEmpty();
+        if (expectedEndStatus == OperationalJobStatus.SUCCEEDED)
+        {
+            assertThat(jobStatusBody.getString("lastUpdate")).contains("completed");
+            assertThat(jobStatusBody.getJsonArray("nodesSucceeded")).containsExactly(expectedHostId);
+            assertThat(jobStatusBody.getJsonArray("nodesFailed")).isEmpty();
+        }
+        else if (expectedEndStatus == OperationalJobStatus.FAILED)
+        {
+            assertThat(jobStatusBody.getString("lastUpdate")).contains("failed");
+            assertThat(jobStatusBody.getJsonArray("nodesSucceeded")).isEmpty();
+            assertThat(jobStatusBody.getJsonArray("nodesFailed")).containsExactly(expectedHostId);
+        }
     }
 
     /**

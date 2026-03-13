@@ -26,6 +26,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import javax.management.Notification;
@@ -520,6 +521,25 @@ public class CassandraAdapterDelegate implements ICassandraAdapter, Host.StateLi
         return nodeSettingsFromJmx != null;
     }
 
+    /**
+     * @return the Cassandra host UUID fetched via JMX
+     * @throws CassandraUnavailableException when JMX is not available
+     */
+    @NotNull
+    public UUID hostId() throws CassandraUnavailableException
+    {
+        try
+        {
+            LimitedStorageOperations storageOperations =
+            jmxClient.proxy(LimitedStorageOperations.class, STORAGE_SERVICE_OBJ_NAME);
+            return UUID.fromString(storageOperations.getLocalHostId());
+        }
+        catch (RuntimeException e)
+        {
+            throw new CassandraUnavailableException(JMX, e);
+        }
+    }
+
     public void close()
     {
         closed = true;
@@ -689,6 +709,11 @@ public class CassandraAdapterDelegate implements ICassandraAdapter, Host.StateLi
          * @return a collection of tokens formatted as strings
          */
         List<String> getTokens();
+
+        /**
+         * @return the local host ID for this Cassandra node
+         */
+        String getLocalHostId();
     }
 
     /**

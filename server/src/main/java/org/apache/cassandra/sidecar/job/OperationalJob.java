@@ -18,6 +18,8 @@
 
 package org.apache.cassandra.sidecar.job;
 
+import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,6 +36,7 @@ import org.apache.cassandra.sidecar.common.utils.Preconditions;
 import org.apache.cassandra.sidecar.concurrent.TaskExecutorPool;
 import org.apache.cassandra.sidecar.tasks.Task;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * An abstract class representing operational jobs that run on Cassandra
@@ -44,25 +47,73 @@ public abstract class OperationalJob implements Task<Void>
 
     // use v1 time-based uuid
     private final UUID jobId;
+    // The Cassandra host UUID for single-node jobs; null for cluster-wide jobs that manage node lists themselves
+    @Nullable
+    private final UUID nodeId;
 
     private final Promise<Void> executionPromise;
     private volatile boolean isExecuting = false;
+    private volatile Long startTime;
+    private volatile String lastUpdate;
+
+    // Node tracking fields for job progress
+    private volatile List<UUID> nodesPending;
+    private volatile List<UUID> nodesExecuting;
+    private volatile List<UUID> nodesSucceeded;
+    private volatile List<UUID> nodesFailed;
 
     /**
-     * Constructs a job with a unique UUID, in Pending state
+     * Constructs a job with a unique UUID, in Pending state.
+     * Node tracking lists are initialized to empty; cluster-wide job subclasses manage them via protected setters.
      *
      * @param jobId UUID representing the Job to be created
      */
     protected OperationalJob(UUID jobId)
     {
+        this(jobId, null);
+    }
+
+    /**
+     * Constructs a job with a unique UUID and an associated Cassandra node.
+     * When {@code nodeId} is provided, node tracking lists are automatically initialized
+     * and managed throughout the job lifecycle in {@link #execute(Promise)}.
+     * When {@code nodeId} is {@code null}, lists are initialized to empty and can be
+     * managed by cluster-wide job subclasses via protected setters.
+     *
+     * @param jobId  UUID representing the Job to be created
+     * @param nodeId the Cassandra host UUID for this single-node job, or {@code null} for cluster-wide jobs
+     */
+    protected OperationalJob(UUID jobId, @Nullable UUID nodeId)
+    {
         Preconditions.checkArgument(jobId.version() == 1, "OperationalJob accepts only time-based UUID");
         this.jobId = jobId;
+        this.nodeId = nodeId;
         this.executionPromise = Promise.promise();
+        if (nodeId != null)
+        {
+            this.nodesPending = Collections.singletonList(nodeId);
+        }
+        else
+        {
+            this.nodesPending = Collections.emptyList();
+        }
+        this.nodesExecuting = Collections.emptyList();
+        this.nodesSucceeded = Collections.emptyList();
+        this.nodesFailed = Collections.emptyList();
     }
 
     public UUID jobId()
     {
         return jobId;
+    }
+
+    /**
+     * @return the Cassandra host UUID for single-node jobs, or {@code null} for cluster-wide jobs
+     */
+    @Nullable
+    public UUID nodeId()
+    {
+        return nodeId;
     }
 
     @Override
@@ -78,6 +129,94 @@ public abstract class OperationalJob implements Task<Void>
     public long creationTime()
     {
         return UUIDs.unixTimestamp(jobId);
+    }
+
+    /**
+     * @return unix timestamp in milliseconds of when the job execution started, or {@code null} if not yet started
+     */
+    @Nullable
+    public Long startTime()
+    {
+        return startTime;
+    }
+
+    /**
+     * @return ISO-8601 formatted start time string, or {@code null} if not yet started
+     */
+    @Nullable
+    public String formattedStartTime()
+    {
+        return startTime != null ? Instant.ofEpochMilli(startTime).toString() : null;
+    }
+
+    /**
+     * @return list of node IDs pending execution
+     */
+    @NotNull
+    public List<UUID> nodesPending()
+    {
+        return nodesPending;
+    }
+
+    protected void nodesPending(List<UUID> nodesPending)
+    {
+        this.nodesPending = nodesPending;
+    }
+
+    /**
+     * @return list of node IDs currently executing
+     */
+    @NotNull
+    public List<UUID> nodesExecuting()
+    {
+        return nodesExecuting;
+    }
+
+    protected void nodesExecuting(List<UUID> nodesExecuting)
+    {
+        this.nodesExecuting = nodesExecuting;
+    }
+
+    /**
+     * @return list of node IDs that have succeeded
+     */
+    @NotNull
+    public List<UUID> nodesSucceeded()
+    {
+        return nodesSucceeded;
+    }
+
+    protected void nodesSucceeded(List<UUID> nodesSucceeded)
+    {
+        this.nodesSucceeded = nodesSucceeded;
+    }
+
+    /**
+     * @return list of node IDs that have failed
+     */
+    @NotNull
+    public List<UUID> nodesFailed()
+    {
+        return nodesFailed;
+    }
+
+    protected void nodesFailed(List<UUID> nodesFailed)
+    {
+        this.nodesFailed = nodesFailed;
+    }
+
+    /**
+     * @return a human-readable status message, or {@code null} if not set
+     */
+    @Nullable
+    public String lastUpdate()
+    {
+        return lastUpdate;
+    }
+
+    protected void lastUpdate(String lastUpdate)
+    {
+        this.lastUpdate = lastUpdate;
     }
 
     /**
@@ -203,6 +342,13 @@ public abstract class OperationalJob implements Task<Void>
     public void execute(Promise<Void> promise)
     {
         isExecuting = true;
+        startTime = System.currentTimeMillis();
+        lastUpdate = String.format("Started %s %s", name(), jobId);
+        if (nodeId != null)
+        {
+            nodesPending = Collections.emptyList();
+            nodesExecuting = Collections.singletonList(nodeId);
+        }
         LOGGER.info("Executing job. jobId={}", jobId);
         promise.future().onComplete(executionPromise);
         try
@@ -211,11 +357,23 @@ public abstract class OperationalJob implements Task<Void>
             internalFuture.onComplete(ar -> {
                 if (ar.succeeded())
                 {
+                    if (nodeId != null)
+                    {
+                        nodesExecuting = Collections.emptyList();
+                        nodesSucceeded = Collections.singletonList(nodeId);
+                    }
+                    lastUpdate = String.format("%s %s completed", name(), jobId);
                     promise.tryComplete();
                     LOGGER.info("Complete job execution. jobId={} status={}", jobId, status());
                 }
                 else
                 {
+                    if (nodeId != null)
+                    {
+                        nodesExecuting = Collections.emptyList();
+                        nodesFailed = Collections.singletonList(nodeId);
+                    }
+                    lastUpdate = String.format("%s %s failed with %s", name(), jobId, ar.cause().getMessage());
                     promise.tryFail(ar.cause());
                     LOGGER.error("Job execution failed. jobId={} reason={}", jobId, ar.cause().getMessage());
                 }
@@ -223,7 +381,13 @@ public abstract class OperationalJob implements Task<Void>
         }
         catch (Throwable e)
         {
+            if (nodeId != null)
+            {
+                nodesExecuting = Collections.emptyList();
+                nodesFailed = Collections.singletonList(nodeId);
+            }
             OperationalJobException oje = OperationalJobException.wraps(e);
+            lastUpdate = String.format("%s %s failed with %s", name(), jobId, oje.getMessage());
             LOGGER.error("Job execution failed. jobId={} reason={}", jobId, oje.getMessage(), oje);
             promise.tryFail(oje);
         }

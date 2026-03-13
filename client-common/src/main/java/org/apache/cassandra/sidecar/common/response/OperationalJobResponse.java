@@ -18,6 +18,7 @@
 
 package org.apache.cassandra.sidecar.common.response;
 
+import java.util.List;
 import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -37,17 +38,35 @@ public class OperationalJobResponse
     private final OperationalJobStatus status;
     private final String operation;
     private final String reason;
+    private final String startTime;
+    private final List<UUID> nodesPending;
+    private final List<UUID> nodesExecuting;
+    private final List<UUID> nodesSucceeded;
+    private final List<UUID> nodesFailed;
+    private final String lastUpdate;
 
     @JsonCreator
     public OperationalJobResponse(@JsonProperty("jobId") UUID jobId,
                                   @JsonProperty("jobStatus") OperationalJobStatus status,
                                   @JsonProperty("operation") String operation,
-                                  @JsonProperty("reason") String reason)
+                                  @JsonProperty("reason") String reason,
+                                  @JsonProperty("startTime") String startTime,
+                                  @JsonProperty("nodesPending") List<UUID> nodesPending,
+                                  @JsonProperty("nodesExecuting") List<UUID> nodesExecuting,
+                                  @JsonProperty("nodesSucceeded") List<UUID> nodesSucceeded,
+                                  @JsonProperty("nodesFailed") List<UUID> nodesFailed,
+                                  @JsonProperty("lastUpdate") String lastUpdate)
     {
         this.jobId = jobId;
         this.status = status;
         this.operation = operation;
         this.reason = reason;
+        this.startTime = startTime;
+        this.nodesPending = nodesPending;
+        this.nodesExecuting = nodesExecuting;
+        this.nodesSucceeded = nodesSucceeded;
+        this.nodesFailed = nodesFailed;
+        this.lastUpdate = lastUpdate;
     }
 
     /**
@@ -86,4 +105,57 @@ public class OperationalJobResponse
         return reason;
     }
 
+    /**
+     * @return the time the job execution started
+     */
+    @JsonProperty("startTime")
+    public String startTime()
+    {
+        return startTime;
+    }
+
+    /**
+     * @return list of node IDs pending execution
+     */
+    @JsonProperty("nodesPending")
+    public List<UUID> nodesPending()
+    {
+        return nodesPending;
+    }
+
+    /**
+     * @return list of node IDs currently executing
+     */
+    @JsonProperty("nodesExecuting")
+    public List<UUID> nodesExecuting()
+    {
+        return nodesExecuting;
+    }
+
+    /**
+     * @return list of node IDs that have succeeded
+     */
+    @JsonProperty("nodesSucceeded")
+    public List<UUID> nodesSucceeded()
+    {
+        return nodesSucceeded;
+    }
+
+    /**
+     * @return list of node IDs that have failed
+     */
+    @JsonProperty("nodesFailed")
+    public List<UUID> nodesFailed()
+    {
+        return nodesFailed;
+    }
+
+    /**
+     * @return a human-readable status message
+     */
+    @JsonProperty("lastUpdate")
+    public String lastUpdate()
+    {
+        return lastUpdate;
+    }
 }

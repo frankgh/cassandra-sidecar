@@ -39,9 +39,9 @@ public class NodeDecommissionJob extends OperationalJob
     private final boolean isForce;
     protected StorageOperations storageOperations;
 
-    public NodeDecommissionJob(UUID jobId, StorageOperations storageOps, boolean isForce)
+    public NodeDecommissionJob(UUID jobId, UUID nodeId, StorageOperations storageOps, boolean isForce)
     {
-        super(jobId);
+        super(jobId, nodeId);
         this.storageOperations = storageOps;
         this.isForce = isForce;
     }

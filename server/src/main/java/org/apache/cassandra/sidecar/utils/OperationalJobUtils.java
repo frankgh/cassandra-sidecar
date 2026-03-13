@@ -54,7 +54,11 @@ public class OperationalJobUtils
             String reason = exception.getMessage();
             LOGGER.error("Conflicting job encountered. reason={}", reason);
             context.response().setStatusCode(HttpResponseStatus.CONFLICT.code());
-            context.json(new OperationalJobResponse(job.jobId(), OperationalJobStatus.FAILED, job.name(), reason));
+            context.json(new OperationalJobResponse(job.jobId(), OperationalJobStatus.FAILED, job.name(), reason,
+                                                    job.formattedStartTime(),
+                                                    job.nodesPending(), job.nodesExecuting(),
+                                                    job.nodesSucceeded(), job.nodesFailed(),
+                                                    job.lastUpdate()));
             return;
         }
 
@@ -74,6 +78,10 @@ public class OperationalJobUtils
         {
             reason = job.asyncResult().cause().getMessage();
         }
-        context.json(new OperationalJobResponse(job.jobId(), status, job.name(), reason));
+        context.json(new OperationalJobResponse(job.jobId(), status, job.name(), reason,
+                                                job.formattedStartTime(),
+                                                job.nodesPending(), job.nodesExecuting(),
+                                                job.nodesSucceeded(), job.nodesFailed(),
+                                                job.lastUpdate()));
     }
 }

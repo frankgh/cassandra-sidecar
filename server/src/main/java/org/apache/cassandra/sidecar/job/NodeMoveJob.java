@@ -41,9 +41,9 @@ public class NodeMoveJob extends OperationalJob
     private final String newToken;
     protected StorageOperations storageOperations;
 
-    public NodeMoveJob(UUID jobId, String newToken, StorageOperations storageOps)
+    public NodeMoveJob(UUID jobId, UUID nodeId, String newToken, StorageOperations storageOps)
     {
-        super(jobId);
+        super(jobId, nodeId);
         this.newToken = newToken;
         this.storageOperations = storageOps;
     }

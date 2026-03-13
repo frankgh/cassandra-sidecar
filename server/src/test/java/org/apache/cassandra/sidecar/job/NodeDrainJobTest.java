@@ -58,7 +58,7 @@ class NodeDrainJobTest
     {
         mockStorageOperations = mock(StorageOperations.class);
         jobId = UUIDs.timeBased();
-        nodeDrainJob = new NodeDrainJob(jobId, mockStorageOperations);
+        nodeDrainJob = new NodeDrainJob(jobId, null, mockStorageOperations);
     }
 
     @Test

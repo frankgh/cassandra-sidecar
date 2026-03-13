@@ -35,8 +35,6 @@ import org.apache.cassandra.sidecar.utils.CassandraInputValidator;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
 import org.jetbrains.annotations.NotNull;
 
-import static org.apache.cassandra.sidecar.common.data.OperationalJobStatus.RUNNING;
-
 /**
  * Handler for retrieving the all the jobs running on the sidecar
  */
@@ -72,7 +70,11 @@ public class ListOperationalJobsHandler extends AbstractHandler<Void> implements
         ListOperationalJobsResponse listResponse = new ListOperationalJobsResponse();
         jobManager.allInflightJobs()
                   .stream()
-                  .map(job -> new OperationalJobResponse(job.jobId(), RUNNING, job.name(), null))
+                  .map(job -> new OperationalJobResponse(job.jobId(), job.status(), job.name(), null,
+                                                        job.formattedStartTime(),
+                                                        job.nodesPending(), job.nodesExecuting(),
+                                                        job.nodesSucceeded(), job.nodesFailed(),
+                                                        job.lastUpdate()))
                   .forEach(listResponse::addJob);
         context.json(listResponse);
     }

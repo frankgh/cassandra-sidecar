@@ -61,14 +61,14 @@ class NodeMoveJobTest
     @Test
     void testJobName()
     {
-        NodeMoveJob job = new NodeMoveJob(jobId, newToken, mockStorageOperations);
+        NodeMoveJob job = new NodeMoveJob(jobId, null, newToken, mockStorageOperations);
         assertThat(job.name()).isEqualTo(OPERATION_MOVE);
     }
 
     @Test
     void testJobId()
     {
-        NodeMoveJob job = new NodeMoveJob(jobId, newToken, mockStorageOperations);
+        NodeMoveJob job = new NodeMoveJob(jobId, null, newToken, mockStorageOperations);
         assertThat(job.jobId()).isEqualTo(jobId);
     }
 
@@ -76,7 +76,7 @@ class NodeMoveJobTest
     void testIsRunningOnCassandraWhenMoving()
     {
         when(mockStorageOperations.operationMode()).thenReturn(OPERATION_MODE_MOVING);
-        NodeMoveJob job = new NodeMoveJob(jobId, newToken, mockStorageOperations);
+        NodeMoveJob job = new NodeMoveJob(jobId, null, newToken, mockStorageOperations);
         assertThat(job.hasConflict(Collections.emptyList())).isTrue();
     }
 
@@ -84,7 +84,7 @@ class NodeMoveJobTest
     void testIsRunningOnCassandraWhenNormal()
     {
         when(mockStorageOperations.operationMode()).thenReturn(OPERATION_MODE_NORMAL);
-        NodeMoveJob job = new NodeMoveJob(jobId, newToken, mockStorageOperations);
+        NodeMoveJob job = new NodeMoveJob(jobId, null, newToken, mockStorageOperations);
         assertThat(job.hasConflict(Collections.emptyList())).isFalse();
     }
 
@@ -92,7 +92,7 @@ class NodeMoveJobTest
     void testIsRunningOnCassandraWhenOtherMode()
     {
         when(mockStorageOperations.operationMode()).thenReturn(OPERATION_MODE_JOINING);
-        NodeMoveJob job = new NodeMoveJob(jobId, newToken, mockStorageOperations);
+        NodeMoveJob job = new NodeMoveJob(jobId, null, newToken, mockStorageOperations);
         assertThat(job.hasConflict(Collections.emptyList())).isFalse();
     }
 
@@ -100,7 +100,7 @@ class NodeMoveJobTest
     void testStatusWhenNormal()
     {
         when(mockStorageOperations.operationMode()).thenReturn(OPERATION_MODE_NORMAL);
-        NodeMoveJob job = new NodeMoveJob(jobId, newToken, mockStorageOperations);
+        NodeMoveJob job = new NodeMoveJob(jobId, null, newToken, mockStorageOperations);
         assertThat(job.status()).isEqualTo(OperationalJobStatus.CREATED);
     }
 
@@ -111,7 +111,7 @@ class NodeMoveJobTest
         RuntimeException testException = new RuntimeException("Test failure");
         doThrow(testException).when(mockStorageOperations).move(newToken);
 
-        NodeMoveJob job = new NodeMoveJob(jobId, newToken, mockStorageOperations);
+        NodeMoveJob job = new NodeMoveJob(jobId, null, newToken, mockStorageOperations);
 
         Promise<Void> promise = Promise.promise();
         job.execute(promise);
@@ -124,7 +124,7 @@ class NodeMoveJobTest
     void testExecuteInternalCallsMove() throws IOException
     {
         when(mockStorageOperations.operationMode()).thenReturn(OPERATION_MODE_NORMAL);
-        NodeMoveJob job = new NodeMoveJob(jobId, newToken, mockStorageOperations);
+        NodeMoveJob job = new NodeMoveJob(jobId, null, newToken, mockStorageOperations);
 
         Promise<Void> promise = Promise.promise();
         job.execute(promise);
@@ -140,7 +140,7 @@ class NodeMoveJobTest
         RuntimeException testException = new RuntimeException("Test exception");
         doThrow(testException).when(mockStorageOperations).move(newToken);
 
-        NodeMoveJob job = new NodeMoveJob(jobId, newToken, mockStorageOperations);
+        NodeMoveJob job = new NodeMoveJob(jobId, null, newToken, mockStorageOperations);
 
         Promise<Void> promise = Promise.promise();
         job.execute(promise);
@@ -156,7 +156,7 @@ class NodeMoveJobTest
     void testJobWithNegativeToken()
     {
         String negativeToken = "-9223372036854775808";
-        NodeMoveJob job = new NodeMoveJob(jobId, negativeToken, mockStorageOperations);
+        NodeMoveJob job = new NodeMoveJob(jobId, null, negativeToken, mockStorageOperations);
         assertThat(job.name()).isEqualTo(OPERATION_MOVE);
         assertThat(job.jobId()).isEqualTo(jobId);
     }

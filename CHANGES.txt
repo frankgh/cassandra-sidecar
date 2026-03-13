@@ -4,6 +4,7 @@
 
 0.3.0
 -----
+ * Update OperationalJob class to support cluster-wide operations (CASSSIDECAR-376)
  * RangeManager should be singleton in CDCModule (CASSSIDECAR-411)
  * CDC: Add end-to-end CDC integration tests (CASSSIDECAR-308)
  * SchemaStorePublisherFactory should be Injectable in CachingSchemaStore (CASSSIDECAR-408)

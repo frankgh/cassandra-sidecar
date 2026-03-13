@@ -77,9 +77,9 @@ public class NodeDrainJob extends OperationalJob
         }
     }
 
-    public NodeDrainJob(UUID jobId, StorageOperations storageOps)
+    public NodeDrainJob(UUID jobId, UUID nodeId, StorageOperations storageOps)
     {
-        super(jobId);
+        super(jobId, nodeId);
         this.storageOperations = storageOps;
     }
 
