@@ -256,6 +256,65 @@ jobs:
       - store_test_results:
           path: build/test-results/
 
+  integration_cassandra_60_java11:
+    docker:
+      - image: cimg/openjdk:11.0
+    environment:
+      INTEGRATION_MAX_PARALLEL_FORKS: 2
+      INTEGRATION_MAX_HEAP_SIZE: "2000M"
+    resource_class: large
+    steps:
+      - install_common
+      - checkout
+      - restore_gradle_cache
+      - attach_workspace:
+          at: dtest-jars
+      - run: ./scripts/install-shaded-dtest-jar-local.sh
+      - run: ./gradlew --no-daemon --max-workers=2 -PdtestVersion=6.0 -Dcassandra.sidecar.versions_to_test="6.0" checkstyleIntegrationTest spotbugsIntegrationTest integrationTestLightWeight --stacktrace
+      - save_gradle_cache
+
+      - store_artifacts:
+          path: build/reports
+          destination: test-reports
+
+      - store_artifacts:
+          path: build/test-results/
+          destination: test-results
+
+      - store_test_results:
+          path: build/test-results/
+
+  integration_heavy_cassandra_60_java11:
+    docker:
+      - image: cimg/openjdk:11.0
+    environment:
+      INTEGRATION_MAX_PARALLEL_FORKS: 3
+      INTEGRATION_MAX_HEAP_SIZE: "3600M"
+    resource_class: large
+    steps:
+      - install_common
+      - setup_remote_docker
+      - checkout
+      - restore_gradle_cache
+      - attach_workspace:
+          at: dtest-jars
+      - attach_workspace:
+          at: cassandra-tarballs
+      - run: ./scripts/install-shaded-dtest-jar-local.sh
+      - run: ./gradlew --no-daemon -PdtestVersion=6.0 -PtarballVersion=6.0 -Dcassandra.sidecar.versions_to_test="6.0" jar integrationTestHeavyWeight --stacktrace
+      - save_gradle_cache
+
+      - store_artifacts:
+          path: build/reports
+          destination: test-reports
+
+      - store_artifacts:
+          path: build/test-results/
+          destination: test-results
+
+      - store_test_results:
+          path: build/test-results/
+
   integration_cassandra_trunk_java11:
     docker:
       - image: cimg/openjdk:11.0
@@ -270,7 +329,7 @@ jobs:
       - attach_workspace:
           at: dtest-jars
       - run: ./scripts/install-shaded-dtest-jar-local.sh
-      - run: ./gradlew --no-daemon --max-workers=2 -PdtestVersion=5.1 -Dcassandra.sidecar.versions_to_test="5.1" checkstyleIntegrationTest spotbugsIntegrationTest integrationTestLightWeight --stacktrace
+      - run: ./gradlew --no-daemon --max-workers=2 -PdtestVersion=7.0 -Dcassandra.sidecar.versions_to_test="7.0" checkstyleIntegrationTest spotbugsIntegrationTest integrationTestLightWeight --stacktrace
       - save_gradle_cache
 
       - store_artifacts:
@@ -301,7 +360,7 @@ jobs:
       - attach_workspace:
           at: cassandra-tarballs
       - run: ./scripts/install-shaded-dtest-jar-local.sh
-      - run: ./gradlew --no-daemon -PdtestVersion=5.1 -PtarballVersion=5.1 -Dcassandra.sidecar.versions_to_test="5.1" jar integrationTestHeavyWeight --stacktrace
+      - run: ./gradlew --no-daemon -PdtestVersion=7.0 -PtarballVersion=7.0 -Dcassandra.sidecar.versions_to_test="7.0" jar integrationTestHeavyWeight --stacktrace
       - save_gradle_cache
 
       - store_artifacts:
@@ -439,6 +498,10 @@ workflows:
           requires:
             - unit_java11
             - build-dtest-jdk11
+      - integration_cassandra_60_java11:
+          requires:
+            - unit_java11
+            - build-dtest-jdk11
       - integration_cassandra_trunk_java11:
           requires:
             - unit_java11
@@ -448,6 +511,10 @@ workflows:
             - unit_java11
             - build-dtest-jdk11
       - integration_heavy_cassandra_50_java11:
+          requires:
+            - unit_java11
+            - build-dtest-jdk11
+      - integration_heavy_cassandra_60_java11:
           requires:
             - unit_java11
             - build-dtest-jdk11
@@ -463,6 +530,8 @@ workflows:
             - integration_heavy_cassandra_40_java11
             - integration_cassandra_50_java11
             - integration_heavy_cassandra_50_java11
+            - integration_cassandra_60_java11
+            - integration_heavy_cassandra_60_java11
             - integration_cassandra_trunk_java11
             - integration_heavy_cassandra_trunk_java11
       - docker_build:
@@ -473,6 +542,8 @@ workflows:
             - integration_heavy_cassandra_40_java11
             - integration_cassandra_50_java11
             - integration_heavy_cassandra_50_java11
+            - integration_cassandra_60_java11
+            - integration_heavy_cassandra_60_java11
             - integration_cassandra_trunk_java11
             - integration_heavy_cassandra_trunk_java11
       - rpm_build_install:
@@ -483,6 +554,8 @@ workflows:
             - integration_heavy_cassandra_40_java11
             - integration_cassandra_50_java11
             - integration_heavy_cassandra_50_java11
+            - integration_cassandra_60_java11
+            - integration_heavy_cassandra_60_java11
             - integration_cassandra_trunk_java11
             - integration_heavy_cassandra_trunk_java11
       - deb_build_install:
@@ -493,5 +566,7 @@ workflows:
             - integration_heavy_cassandra_40_java11
             - integration_cassandra_50_java11
             - integration_heavy_cassandra_50_java11
+            - integration_cassandra_60_java11
+            - integration_heavy_cassandra_60_java11
             - integration_cassandra_trunk_java11
             - integration_heavy_cassandra_trunk_java11

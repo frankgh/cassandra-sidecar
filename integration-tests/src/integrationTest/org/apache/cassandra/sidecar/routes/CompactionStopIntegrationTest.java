@@ -26,15 +26,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.google.common.util.concurrent.Uninterruptibles;
-
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpResponseExpectation;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.HttpResponse;
-
+import org.apache.cassandra.distributed.api.IInstance;
 import org.apache.cassandra.sidecar.common.data.CompactionStopStatus;
 import org.apache.cassandra.sidecar.common.response.CompactionStatsResponse;
 import org.apache.cassandra.sidecar.common.response.CompactionStopResponse;
@@ -103,36 +105,36 @@ class CompactionStopIntegrationTest extends SharedClusterSidecarIntegrationTestB
         waitForSchemaReady(30, TimeUnit.SECONDS);
 
         // Disable auto-compaction for ALL keyspaces at the beginning
-        cluster.stream().forEach(instance -> {
-            try
-            {
-                // First set compaction throughput to a high value to prevent any initial compactions from taking too long
-                instance.nodetool("setcompactionthroughput", "100");
+        for (int i = 1; i <= cluster.size(); i++)
+        {
+            disableAutoCompactionOnInstance(cluster.get(i));
+        }
+    }
 
-                // Disable auto-compaction globally (no arguments)
-                instance.nodetool("disableautocompaction");
-                logger.info("Disabled auto-compaction globally");
+    void disableAutoCompactionOnInstance(IInstance instance)
+    {
+        // First set compaction throughput to a high value to prevent any initial compactions from taking too long
+        instance.nodetoolResult("setcompactionthroughput", "100").asserts().success();
 
-                // And for our test keyspace
-                instance.nodetool("disableautocompaction", TEST_KEYSPACE);
+        // Disable auto-compaction globally (no arguments)
+        instance.nodetoolResult("disableautocompaction").asserts().success();
+        logger.info("Disabled auto-compaction globally");
 
-                // Log that we've disabled auto-compaction
-                logger.info("Auto-compaction disabled for all keyspaces");
-            }
-            catch (Exception e)
-            {
-                logger.warn("Failed to disable autocompaction in beforeTestStart: {}", e.getMessage());
-            }
-        });
+        // And for our test keyspace
+        instance.nodetoolResult("disableautocompaction", TEST_KEYSPACE).asserts().success();
+
+        // Log that we've disabled auto-compaction
+        logger.info("Auto-compaction disabled for all keyspaces");
     }
 
     @Test
     void testStopCompactionBothParameters()
     {
-        String payload = "{\"compactionType\":\"VALIDATION\",\"compactionId\":\"test-id-123\"}";
+        JsonObject payload = JsonObject.of("compactionType", "VALIDATION",
+                                           "compactionId", "test-id-123");
         HttpResponse<Buffer> response
         = getBlocking(trustedClient().put(serverWrapper.serverPort, "localhost", COMPACTION_STOP_ROUTE)
-                                     .sendBuffer(buffer(payload))
+                                     .sendBuffer(payload.toBuffer())
                                      .expecting(HttpResponseExpectation.SC_OK));
 
         assertThat(response.statusCode()).isEqualTo(HttpResponseStatus.OK.code());
@@ -146,10 +148,10 @@ class CompactionStopIntegrationTest extends SharedClusterSidecarIntegrationTestB
     @Test
     void testStopCompactionMissingBothParameters()
     {
-        String payload = "{}";
+        JsonObject payload = JsonObject.of();
         HttpResponse<Buffer> response
         = getBlocking(trustedClient().put(serverWrapper.serverPort, "localhost", COMPACTION_STOP_ROUTE)
-                                     .sendBuffer(buffer(payload)));
+                                     .sendJsonObject(payload));
 
         assertThat(response.statusCode()).isEqualTo(HttpResponseStatus.BAD_REQUEST.code());
         JsonObject errorResponse = response.bodyAsJsonObject();
@@ -159,10 +161,10 @@ class CompactionStopIntegrationTest extends SharedClusterSidecarIntegrationTestB
     @Test
     void testStopCompactionInvalidType()
     {
-        String payload = "{\"compactionType\":\"INVALID_TYPE\"}";
+        JsonObject payload = JsonObject.of("compactionType", "INVALID_TYPE");
         HttpResponse<Buffer> response
         = getBlocking(trustedClient().put(serverWrapper.serverPort, "localhost", COMPACTION_STOP_ROUTE)
-                                     .sendBuffer(buffer(payload)));
+                                     .sendJsonObject(payload));
 
         assertThat(response.statusCode()).isEqualTo(HttpResponseStatus.BAD_REQUEST.code());
     }
@@ -178,49 +180,41 @@ class CompactionStopIntegrationTest extends SharedClusterSidecarIntegrationTestB
         assertThat(response.statusCode()).isEqualTo(HttpResponseStatus.BAD_REQUEST.code());
     }
 
-    @Test
-    void testStopCompactionAllSupportedTypes()
+    @ParameterizedTest(name = "{index} => compactionType={0}")
+    @ValueSource(strings = { "COMPACTION", "VALIDATION", "KEY_CACHE_SAVE", "ROW_CACHE_SAVE",
+                             "COUNTER_CACHE_SAVE", "CLEANUP", "SCRUB", "UPGRADE_SSTABLES",
+                             "INDEX_BUILD", "TOMBSTONE_COMPACTION", "ANTICOMPACTION",
+                             "VERIFY", "VIEW_BUILD", "INDEX_SUMMARY", "RELOCATE",
+                             "GARBAGE_COLLECT", "MAJOR_COMPACTION" })
+    void testStopCompactionAllSupportedTypes(String compactionType)
     {
-        String[] supportedTypes = {
-                "COMPACTION", "VALIDATION", "KEY_CACHE_SAVE", "ROW_CACHE_SAVE",
-                "COUNTER_CACHE_SAVE", "CLEANUP", "SCRUB", "UPGRADE_SSTABLES",
-                "INDEX_BUILD", "TOMBSTONE_COMPACTION", "ANTICOMPACTION",
-                "VERIFY", "VIEW_BUILD", "INDEX_SUMMARY", "RELOCATE",
-                "GARBAGE_COLLECT", "MAJOR_COMPACTION"
-        };
         String cassandraVersion = testVersion.version();
+        JsonObject payload = JsonObject.of("compactionType", compactionType);
 
-        for (String compactionType : supportedTypes)
+        HttpResponse<Buffer> response = getBlocking(
+        trustedClient().put(serverWrapper.serverPort, "localhost", COMPACTION_STOP_ROUTE)
+                       .sendJsonObject(payload));
+
+        if ("MAJOR_COMPACTION".equals(compactionType) && cassandraVersion.startsWith("4."))
         {
-            String payload = String.format("{\"compactionType\":\"%s\"}", compactionType);
-
-            HttpResponse<Buffer> response = getBlocking(
-                    trustedClient().put(serverWrapper.serverPort, "localhost", COMPACTION_STOP_ROUTE)
-                            .sendBuffer(buffer(payload))
-            );
-            if (compactionType.equals("MAJOR_COMPACTION") && cassandraVersion.startsWith("4."))
-            {
-                assertThat(response.statusCode()).isEqualTo(HttpResponseStatus.BAD_REQUEST.code());
-
-            }
-            else
-            {
-                assertThat(response.statusCode()).isEqualTo(HttpResponseStatus.OK.code());
-                CompactionStopResponse stopResponse = response.bodyAsJson(CompactionStopResponse.class);
-                assertThat(stopResponse.status()).isEqualTo(CompactionStopStatus.SUBMITTED);
-                assertThat(stopResponse.compactionType()).isEqualTo(compactionType);
-            }
+            assertThat(response.statusCode()).isEqualTo(HttpResponseStatus.BAD_REQUEST.code());
+        }
+        else
+        {
+            assertThat(response.statusCode()).isEqualTo(HttpResponseStatus.OK.code());
+            CompactionStopResponse stopResponse = response.bodyAsJson(CompactionStopResponse.class);
+            assertThat(stopResponse.status()).isEqualTo(CompactionStopStatus.SUBMITTED);
+            assertThat(stopResponse.compactionType()).isEqualTo(compactionType);
         }
     }
 
     @Test
     void testUnsupportedCompactionTypeForCassandraVersion()
     {
-        String payload = "{\"compactionType\":\"MAJOR_COMPACTION\"}";
+        JsonObject payload = JsonObject.of("compactionType", "MAJOR_COMPACTION");
         HttpResponse<Buffer> response = getBlocking(
-            trustedClient().put(serverWrapper.serverPort, "localhost", COMPACTION_STOP_ROUTE)
-                .sendBuffer(buffer(payload))
-        );
+        trustedClient().put(serverWrapper.serverPort, "localhost", COMPACTION_STOP_ROUTE)
+                       .sendJsonObject(payload));
         String cassandraVersion = testVersion.version();
 
         // Check MAJOR_COMPACTION rejected with Cassandra 4.x, accepted with 5.x
@@ -231,14 +225,14 @@ class CompactionStopIntegrationTest extends SharedClusterSidecarIntegrationTestB
             assertThat(errorResponse).isNotNull();
             // Error message could be from handler validation or JMX layer
             String message = errorResponse.getString("message");
-            assertThat(message)
-                .satisfiesAnyOf(
-                    msg -> assertThat(msg).containsIgnoringCase("not supported"),
-                    msg -> assertThat(msg).containsIgnoringCase("No enum constant"),
-                    msg -> assertThat(msg).contains("MAJOR_COMPACTION")
-                );
+            assertThat(message).satisfiesAnyOf(msg -> assertThat(msg).containsIgnoringCase("not supported"),
+                                               msg -> assertThat(msg).containsIgnoringCase("No enum constant"),
+                                               msg -> assertThat(msg).contains("MAJOR_COMPACTION")
+            );
         }
-        else if (cassandraVersion.startsWith("5."))
+        else if (cassandraVersion.startsWith("5.")
+                 || cassandraVersion.startsWith("6.")
+                 || cassandraVersion.startsWith("7."))
         {
             assertThat(response.statusCode()).isEqualTo(HttpResponseStatus.OK.code());
             CompactionStopResponse stopResponse = response.bodyAsJson(CompactionStopResponse.class);
@@ -257,18 +251,12 @@ class CompactionStopIntegrationTest extends SharedClusterSidecarIntegrationTestB
         String largeData = "x".repeat(1000); // 1KB of data per row
 
         // Double-check auto-compaction is disabled before generating data
-        cluster.stream().forEach(instance -> {
-            try
-            {
-                instance.nodetool("disableautocompaction", TEST_KEYSPACE, tableName.table());
-                logger.info("Confirmed auto-compaction disabled for table {} before data generation",
-                            tableName.table());
-            }
-            catch (Exception e)
-            {
-                logger.warn("Failed to confirm auto-compaction is disabled: {}", e.getMessage());
-            }
-        });
+        for (int i = 1; i <= cluster.size(); i++)
+        {
+            cluster.get(i).nodetoolResult("disableautocompaction", TEST_KEYSPACE, tableName.table()).asserts().success();
+            logger.info("Confirmed auto-compaction disabled for table {} before data generation",
+                        tableName.table());
+        }
 
         int rowsPerBatch = 500;
 
@@ -284,19 +272,12 @@ class CompactionStopIntegrationTest extends SharedClusterSidecarIntegrationTestB
             }
 
             // Flush after each batch but verify compaction is still disabled
-            final int currentBatch = batch + 1;
-            cluster.stream().forEach(instance -> {
-                try
-                {
-                    // Flush only accepts one parameter (keyspace)
-                    instance.flush(TEST_KEYSPACE);
-                    logger.debug("Flushed keyspace {} for table {}", TEST_KEYSPACE, tableName.table());
-                }
-                catch (Exception e)
-                {
-                    logger.warn("Failed to flush: {}", e.getMessage());
-                }
-            });
+            for (int i = 1; i <= cluster.size(); i++)
+            {
+                // Flush only accepts one parameter (keyspace)
+                cluster.get(i).flush(TEST_KEYSPACE);
+                logger.debug("Flushed keyspace {} for table {}", TEST_KEYSPACE, tableName.table());
+            }
         }
     }
 
@@ -326,70 +307,45 @@ class CompactionStopIntegrationTest extends SharedClusterSidecarIntegrationTestB
         });
     }
 
+    @DisplayName("Testing that compaction stop by type actually stops compactions")
     @Test
     void testCompactionStopByTypeActuallyStopped()
     {
-        long startTime = System.currentTimeMillis();
-
-        try
+        // 2. THEN set compaction throughput to slow value
+        for (int i = 1; i <= cluster.size(); i++)
         {
-            logger.info("Testing that compaction stop by type actually stops compactions");
+            // 1 MB/sec rather than unlimited
+            cluster.get(i).nodetoolResult("setcompactionthroughput", "1").asserts().success();
+        }
 
-            // 2. THEN set compaction throughput to slow value
-            cluster.stream().forEach(instance -> {
-                try
-                {
-                    instance.nodetool("setcompactionthroughput", "1"); // 1 MB/sec rather than unlimited
-                }
-                catch (Exception e)
-                {
-                    logger.warn("Failed to set compaction throughput for stopByType: {}", e.getMessage());
-                }
-            });
+        // 3. THEN generate data (with reduced volume)
+        for (QualifiedName tableName : COMPACTION_TEST_TABLES)
+        {
+            generateSSTables(tableName, 20); // Reduced from 200 to 20
+        }
 
-            // 3. THEN generate data (with reduced volume)
-            for (QualifiedName tableName : COMPACTION_TEST_TABLES)
+        for (QualifiedName tableName : COMPACTION_TEST_TABLES)
+        {
+            for (int i = 1; i <= cluster.size(); i++)
             {
-                generateSSTables(tableName, 20); // Reduced from 200 to 20
-            }
-
-            for (QualifiedName tableName : COMPACTION_TEST_TABLES)
-            {
-                cluster.stream().forEach(instance -> {
-                    try
-                    {
-                        instance.nodetool("enableautocompaction", TEST_KEYSPACE, tableName.table());
-                    }
-                    catch (Exception e)
-                    {
-                        logger.warn("Failed to re-enable autocompaction: {}", e.getMessage());
-                    }
-                });
-            }
-
-            // Add initial delay to allow compaction to start
-            logger.info("Waiting for compaction to start...");
-
-            // Poll for active compaction and stop it
-            boolean compactionStopped = pollAndStopCompactionByType("Compaction", 30);
-
-            if (!compactionStopped)
-            {
-                logger.error("Could not catch compaction in testable state - skipping test");
+                cluster.get(i).nodetoolResult("enableautocompaction", TEST_KEYSPACE, tableName.table()).asserts().success();
             }
         }
-        finally
-        {
-            long duration = System.currentTimeMillis() - startTime;
-            logger.info("Test completed in {} ms", duration);
-        }
+
+        // Add initial delay to allow compaction to start
+        logger.info("Waiting for compaction to start...");
+
+        // Poll for active compaction and stop it
+        boolean compactionStopped = pollAndStopCompactionByType("Compaction", 30);
+        assertThat(compactionStopped).as("Could not catch compaction in testable state")
+                                     .isTrue();
     }
 
     /**
      * Polls for an active compaction and attempts to stop it by type
      *
      * @param compactionType The type of compaction to look for and stop
-     * @param maxAttempts Maximum number of polling attempts
+     * @param maxAttempts    Maximum number of polling attempts
      * @return true if a compaction was found and stopped successfully, false otherwise
      */
     private boolean pollAndStopCompactionByType(String compactionType, int maxAttempts)
@@ -434,11 +390,11 @@ class CompactionStopIntegrationTest extends SharedClusterSidecarIntegrationTestB
                         actualCompactionType.get(), progress, compaction.id());
 
             // Stop compaction by type
-            String stopPayload = "{\"compactionType\":\"" + actualCompactionType.get() + "\"}";
+            JsonObject stopPayload = JsonObject.of("compactionType", actualCompactionType.get());
 
             HttpResponse<Buffer> stopResponse
             = getBlocking(trustedClient().put(serverWrapper.serverPort, "localhost", COMPACTION_STOP_ROUTE)
-                                         .sendBuffer(buffer(stopPayload))
+                                         .sendJsonObject(stopPayload)
                                          .expecting(HttpResponseExpectation.SC_OK));
 
             assertThat(stopResponse.statusCode()).isEqualTo(HttpResponseStatus.OK.code());
@@ -457,65 +413,36 @@ class CompactionStopIntegrationTest extends SharedClusterSidecarIntegrationTestB
         return compactionStopped.get();
     }
 
+    @DisplayName("Testing that compaction stop by ID actually stops compactions")
     @Test
     void testCompactionStopByIdActuallyStopped()
     {
-        long startTime = System.currentTimeMillis();
-
-        try
+        // 2. THEN set compaction throughput to slow value
+        for (int i = 1; i <= cluster.size(); i++)
         {
-            logger.info("Testing that compaction stop by ID actually stops compactions");
+            // 1 MB/sec rather than unlimited
+            cluster.get(i).nodetoolResult("setcompactionthroughput", "1").asserts().success();
+        }
 
-            // 2. THEN set compaction throughput to slow value
-            cluster.stream().forEach(instance -> {
-                try
-                {
-                    instance.nodetool("setcompactionthroughput", "1"); // 1 MB/sec rather than unlimited
-                }
-                catch (Exception e)
-                {
-                    logger.warn("Failed to set compaction throughput for stopById: {}", e.getMessage());
-                }
-            });
+        // 3. THEN generate data (with reduced volume)
+        for (QualifiedName tableName : COMPACTION_TEST_TABLES)
+        {
+            generateSSTables(tableName, 20); // Reduced from 200 to 20
+        }
 
-            // 3. THEN generate data (with reduced volume)
-            for (QualifiedName tableName : COMPACTION_TEST_TABLES)
+        for (QualifiedName tableName : COMPACTION_TEST_TABLES)
+        {
+            for (int i = 1; i <= cluster.size(); i++)
             {
-                generateSSTables(tableName, 20); // Reduced from 200 to 20
-            }
-
-            for (QualifiedName tableName : COMPACTION_TEST_TABLES)
-            {
-                cluster.stream().forEach(instance -> {
-                    try
-                    {
-                        instance.nodetool("enableautocompaction", TEST_KEYSPACE, tableName.table());
-                    }
-                    catch (Exception e)
-                    {
-                        logger.warn("Failed to re-enable autocompaction: {}", e.getMessage());
-                    }
-                });
-            }
-
-            // Add initial delay to allow compaction to start
-            logger.info("Waiting for compaction to start...");
-
-            // Poll for active compaction and stop it by ID
-            try
-            {
-                pollAndStopCompactionById(30);
-            }
-            catch (Exception e)
-            {
-                logger.warn("Could not catch compaction in testable state");
+                cluster.get(i).nodetoolResult("enableautocompaction", TEST_KEYSPACE, tableName.table()).asserts().success();
             }
         }
-        finally
-        {
-            long duration = System.currentTimeMillis() - startTime;
-            logger.info("Test completed in {} ms", duration);
-        }
+
+        // Add initial delay to allow compaction to start
+        logger.info("Waiting for compaction to start...");
+
+        // Poll for active compaction and stop it by ID
+        assertThat(pollAndStopCompactionById(30)).isTrue();
     }
 
     /**
@@ -565,11 +492,11 @@ class CompactionStopIntegrationTest extends SharedClusterSidecarIntegrationTestB
                         compaction.taskType(), progress, capturedCompactionId.get());
 
             // Stop compaction by ID
-            String stopPayload = "{\"compactionId\":\"" + capturedCompactionId.get() + "\"}";
+            JsonObject stopPayload = JsonObject.of("compactionId", capturedCompactionId.get());
 
             HttpResponse<Buffer> stopResponse
             = getBlocking(trustedClient().put(serverWrapper.serverPort, "localhost", COMPACTION_STOP_ROUTE)
-                                         .sendBuffer(buffer(stopPayload))
+                                         .sendJsonObject(stopPayload)
                                          .expecting(HttpResponseExpectation.SC_OK));
 
             assertThat(stopResponse).isNotNull();

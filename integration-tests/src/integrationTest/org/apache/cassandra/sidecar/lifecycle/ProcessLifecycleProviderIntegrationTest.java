@@ -129,13 +129,18 @@ class ProcessLifecycleProviderIntegrationTest
     @AfterAll
     public static void tearDown() throws ExecutionException, InterruptedException, TimeoutException
     {
-        server.stop(sidecarDeploymentId).toCompletionStage().toCompletableFuture().get(TIMEOUT_SECONDS, SECONDS);
+        if (server != null)
+        {
+            server.stop(sidecarDeploymentId).toCompletionStage().toCompletableFuture().get(TIMEOUT_SECONDS, SECONDS);
+        }
         // Make sure server is stopped
         forceCassandraStop();
     }
 
     private static void forceCassandraStop()
     {
+        if (lifecycleDir == null)
+            return;
         Path pidFileLocation = Path.of(ProcessLifecycleProvider.pidFileLocation(lifecycleDir.toString(), TEST_NODE_ID));
         if (!pidFileLocation.toFile().exists())
         {
@@ -214,11 +219,11 @@ class ProcessLifecycleProviderIntegrationTest
         Path cassandraLogDir = Files.createDirectories(tmpDir.resolve("var/log"));
 
         ProcessRuntimeConfiguration.Builder builder = ProcessRuntimeConfiguration.builder()
-                                          .instance(instanceMetadata())
-                                          .cassandraHome(cassandraHome.toString())
-                                          .cassandraConfDir(confDir.toString())
-                                          .cassandraLogDir(cassandraLogDir.toString())
-                                          .storageDir(cassandraStorageDir.toString());
+                                                                                 .instance(instanceMetadata())
+                                                                                 .cassandraHome(cassandraHome.toString())
+                                                                                 .cassandraConfDir(confDir.toString())
+                                                                                 .cassandraLogDir(cassandraLogDir.toString())
+                                                                                 .storageDir(cassandraStorageDir.toString());
         return new TestProcessRuntimeConfiguration(builder);
     }
 
