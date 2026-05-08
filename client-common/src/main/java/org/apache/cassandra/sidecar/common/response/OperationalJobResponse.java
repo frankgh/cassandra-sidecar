@@ -25,6 +25,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.cassandra.sidecar.common.DataObjectBuilder;
 import org.apache.cassandra.sidecar.common.data.OperationalJobStatus;
 
 /**
@@ -67,6 +68,20 @@ public class OperationalJobResponse
         this.nodesSucceeded = nodesSucceeded;
         this.nodesFailed = nodesFailed;
         this.lastUpdate = lastUpdate;
+    }
+
+    private OperationalJobResponse(Builder builder)
+    {
+        jobId = builder.jobId;
+        status = builder.status;
+        operation = builder.operation;
+        reason = builder.reason;
+        startTime = builder.startTime;
+        nodesPending = builder.nodesPending;
+        nodesExecuting = builder.nodesExecuting;
+        nodesSucceeded = builder.nodesSucceeded;
+        nodesFailed = builder.nodesFailed;
+        lastUpdate = builder.lastUpdate;
     }
 
     /**
@@ -157,5 +172,93 @@ public class OperationalJobResponse
     public String lastUpdate()
     {
         return lastUpdate;
+    }
+
+    public static Builder builder()
+    {
+        return new Builder();
+    }
+
+    /**
+     * {@code OperationalJobResponse} builder static inner class.
+     */
+    public static class Builder implements DataObjectBuilder<Builder, OperationalJobResponse>
+    {
+        private UUID jobId;
+        private OperationalJobStatus status;
+        private String operation;
+        private String reason;
+        private String startTime;
+        private List<UUID> nodesPending;
+        private List<UUID> nodesExecuting;
+        private List<UUID> nodesSucceeded;
+        private List<UUID> nodesFailed;
+        private String lastUpdate;
+
+        private Builder()
+        {
+        }
+
+        @Override
+        public Builder self()
+        {
+            return this;
+        }
+
+        public Builder jobId(UUID jobId)
+        {
+            return update(b -> b.jobId = jobId);
+        }
+
+        public Builder status(OperationalJobStatus status)
+        {
+            return update(b -> b.status = status);
+        }
+
+        public Builder operation(String operation)
+        {
+            return update(b -> b.operation = operation);
+        }
+
+        public Builder reason(String reason)
+        {
+            return update(b -> b.reason = reason);
+        }
+
+        public Builder startTime(String startTime)
+        {
+            return update(b -> b.startTime = startTime);
+        }
+
+        public Builder nodesPending(List<UUID> nodesPending)
+        {
+            return update(b -> b.nodesPending = nodesPending);
+        }
+
+        public Builder nodesExecuting(List<UUID> nodesExecuting)
+        {
+            return update(b -> b.nodesExecuting = nodesExecuting);
+        }
+
+        public Builder nodesSucceeded(List<UUID> nodesSucceeded)
+        {
+            return update(b -> b.nodesSucceeded = nodesSucceeded);
+        }
+
+        public Builder nodesFailed(List<UUID> nodesFailed)
+        {
+            return update(b -> b.nodesFailed = nodesFailed);
+        }
+
+        public Builder lastUpdate(String lastUpdate)
+        {
+            return update(b -> b.lastUpdate = lastUpdate);
+        }
+
+        @Override
+        public OperationalJobResponse build()
+        {
+            return new OperationalJobResponse(this);
+        }
     }
 }

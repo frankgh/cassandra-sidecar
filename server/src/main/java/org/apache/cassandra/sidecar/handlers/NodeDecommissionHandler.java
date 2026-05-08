@@ -87,7 +87,7 @@ public class NodeDecommissionHandler extends AbstractHandler<Boolean> implements
     {
         CassandraAdapterDelegate delegate = metadataFetcher.delegate(host);
         StorageOperations operations = delegate.storageOperations();
-        UUID nodeId = delegate.hostId();
+        UUID nodeId = delegate.nodeSettings().hostId();
         NodeDecommissionJob job = new NodeDecommissionJob(UUIDs.timeBased(), nodeId, operations, isForce);
         this.jobManager.trySubmitJob(job,
                                      (completedJob, exception) ->

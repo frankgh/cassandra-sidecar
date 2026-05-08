@@ -20,6 +20,7 @@ package org.apache.cassandra.sidecar.handlers;
 
 import java.util.Collections;
 import java.util.Set;
+
 import com.google.inject.Inject;
 
 import io.vertx.core.http.HttpServerRequest;
@@ -70,11 +71,18 @@ public class ListOperationalJobsHandler extends AbstractHandler<Void> implements
         ListOperationalJobsResponse listResponse = new ListOperationalJobsResponse();
         jobManager.allInflightJobs()
                   .stream()
-                  .map(job -> new OperationalJobResponse(job.jobId(), job.status(), job.name(), null,
-                                                        job.formattedStartTime(),
-                                                        job.nodesPending(), job.nodesExecuting(),
-                                                        job.nodesSucceeded(), job.nodesFailed(),
-                                                        job.lastUpdate()))
+                  .map(job -> OperationalJobResponse.builder()
+                                                    .jobId(job.jobId())
+                                                    .status(job.status())
+                                                    .operation(job.name())
+                                                    .startTime(job.formattedStartTime())
+                                                    .nodesPending(job.nodesPending())
+                                                    .nodesExecuting(job.nodesExecuting())
+                                                    .nodesSucceeded(job.nodesSucceeded())
+                                                    .nodesFailed(job.nodesFailed())
+                                                    .lastUpdate(job.lastUpdate())
+                                                    .build()
+                  )
                   .forEach(listResponse::addJob);
         context.json(listResponse);
     }

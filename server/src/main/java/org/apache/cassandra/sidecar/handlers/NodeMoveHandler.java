@@ -35,6 +35,7 @@ import io.vertx.ext.web.RoutingContext;
 import org.apache.cassandra.sidecar.acl.authorization.BasicPermissions;
 import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
 import org.apache.cassandra.sidecar.common.request.data.NodeMoveRequestPayload;
+import org.apache.cassandra.sidecar.common.response.NodeSettings;
 import org.apache.cassandra.sidecar.common.server.StorageOperations;
 import org.apache.cassandra.sidecar.common.utils.StringUtils;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
@@ -103,7 +104,7 @@ public class NodeMoveHandler extends AbstractHandler<String> implements AccessPr
     {
         CassandraAdapterDelegate delegate = metadataFetcher.delegate(host);
         StorageOperations operations = delegate.storageOperations();
-        UUID nodeId = delegate.hostId();
+        UUID nodeId = delegate.nodeSettings().hostId();
         NodeMoveJob job = new NodeMoveJob(UUIDs.timeBased(), nodeId, newToken, operations);
         this.jobManager.trySubmitJob(job,
                                      (completedJob, exception) ->

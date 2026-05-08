@@ -308,6 +308,7 @@ public class CassandraAdapterDelegate implements ICassandraAdapter, Host.StateLi
         String partitionerName = storageOperations.getPartitionerName();
         List<String> tokens = maybeGetTokens(storageOperations);
         String dataCenter = endpointSnitchOperations.getDatacenter();
+        UUID hostId = UUID.fromString(storageOperations.getLocalHostId());
 
         return NodeSettings.builder()
                            .releaseVersion(releaseVersion)
@@ -317,6 +318,7 @@ public class CassandraAdapterDelegate implements ICassandraAdapter, Host.StateLi
                            .tokens(new LinkedHashSet<>(tokens))
                            .rpcAddress(localNativeTransportAddress.getAddress())
                            .rpcPort(localNativeTransportAddress.getPort())
+                           .hostId(hostId)
                            .build();
     }
 
@@ -519,25 +521,6 @@ public class CassandraAdapterDelegate implements ICassandraAdapter, Host.StateLi
     public boolean isJmxUp()
     {
         return nodeSettingsFromJmx != null;
-    }
-
-    /**
-     * @return the Cassandra host UUID fetched via JMX
-     * @throws CassandraUnavailableException when JMX is not available
-     */
-    @NotNull
-    public UUID hostId() throws CassandraUnavailableException
-    {
-        try
-        {
-            LimitedStorageOperations storageOperations =
-            jmxClient.proxy(LimitedStorageOperations.class, STORAGE_SERVICE_OBJ_NAME);
-            return UUID.fromString(storageOperations.getLocalHostId());
-        }
-        catch (RuntimeException e)
-        {
-            throw new CassandraUnavailableException(JMX, e);
-        }
     }
 
     public void close()

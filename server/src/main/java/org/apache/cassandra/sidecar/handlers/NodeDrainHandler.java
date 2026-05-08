@@ -30,6 +30,7 @@ import io.vertx.ext.auth.authorization.Authorization;
 import io.vertx.ext.web.RoutingContext;
 import org.apache.cassandra.sidecar.acl.authorization.BasicPermissions;
 import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
+import org.apache.cassandra.sidecar.common.response.NodeSettings;
 import org.apache.cassandra.sidecar.common.server.StorageOperations;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
 import org.apache.cassandra.sidecar.config.ServiceConfiguration;
@@ -85,7 +86,7 @@ public class NodeDrainHandler extends AbstractHandler<Void> implements AccessPro
     {
         CassandraAdapterDelegate delegate = metadataFetcher.delegate(host);
         StorageOperations operations = delegate.storageOperations();
-        UUID nodeId = delegate.hostId();
+        UUID nodeId = delegate.nodeSettings().hostId();
         NodeDrainJob job = new NodeDrainJob(UUIDs.timeBased(), nodeId, operations);
         this.jobManager.trySubmitJob(job,
                                      (completedJob, exception) ->
