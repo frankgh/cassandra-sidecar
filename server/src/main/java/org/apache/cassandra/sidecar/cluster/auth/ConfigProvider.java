@@ -28,8 +28,8 @@ import org.apache.cassandra.sidecar.exceptions.ConfigurationException;
  */
 public class ConfigProvider implements CqlAuthProvider
 {
-    static final String USERNAME_PARAM = "username";
-    static final String PASSWORD_PARAM = "password";
+    public static final String USERNAME_PARAM = "username";
+    public static final String PASSWORD_PARAM = "password";
 
     private final String username;
     private final String password;
