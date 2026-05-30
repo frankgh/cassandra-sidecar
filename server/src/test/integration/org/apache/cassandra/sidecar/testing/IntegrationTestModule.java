@@ -132,14 +132,12 @@ public class IntegrationTestModule extends AbstractModule
                                                                                                Map.of(USERNAME_PARAM, "cassandra",
                                                                                                       PASSWORD_PARAM, "cassandra"));
 
-        DriverConfiguration driverConfiguration = new DriverConfigurationImpl(List.of(),
-                                                                              "dc1",
-                                                                              1,
-                                                                              null,
-                                                                              null,
-                                                                              null,
-                                                                              new SecondBoundConfiguration(3, TimeUnit.SECONDS),
-                                                                              authProvider);
+        DriverConfiguration driverConfiguration = DriverConfigurationImpl.builder()
+                                                                         .localDc("dc1")
+                                                                         .numConnections(1)
+                                                                         .unsupportedTableSchemaRefreshTime(new SecondBoundConfiguration(3, TimeUnit.SECONDS))
+                                                                         .authProvider(authProvider)
+                                                                         .build();
 
         SslConfiguration sslConfiguration =
         SslConfigurationImpl.builder()
