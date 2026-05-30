@@ -19,7 +19,6 @@
 package org.apache.cassandra.sidecar.config.yaml;
 
 import java.net.InetSocketAddress;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -64,26 +63,7 @@ public class DriverConfigurationImpl implements DriverConfiguration
 
     public DriverConfigurationImpl()
     {
-        this(Collections.emptyList(), null, DEFAULT_NUM_CONNECTIONS, null, null, null, DEFAULT_UNSUPPORTED_TABLE_SCHEMA_REFRESH_TIME, null);
-    }
-
-    public DriverConfigurationImpl(List<InetSocketAddress> contactPoints,
-                                   String localDc,
-                                   int numConnections,
-                                   String username,
-                                   String password,
-                                   SslConfiguration sslConfiguration,
-                                   SecondBoundConfiguration unsupportedTableSchemaRefreshTime,
-                                   ParameterizedClassConfiguration authProvider)
-    {
-        this.contactPoints = contactPoints;
-        this.localDc = localDc;
-        this.numConnections = numConnections;
-        this.username = username;
-        this.password = password;
-        this.authProvider = authProvider;
-        this.sslConfiguration = sslConfiguration;
-        this.unsupportedTableSchemaRefreshTime = unsupportedTableSchemaRefreshTime;
+        this(builder());
     }
 
     private DriverConfigurationImpl(Builder builder)
@@ -192,12 +172,12 @@ public class DriverConfigurationImpl implements DriverConfiguration
     {
         private List<InetSocketAddress> contactPoints = List.of();
         private String localDc;
-        private int numConnections;
+        private int numConnections = DEFAULT_NUM_CONNECTIONS;
         private String username;
         private String password;
         private ParameterizedClassConfiguration authProvider;
         private SslConfiguration sslConfiguration;
-        private SecondBoundConfiguration unsupportedTableSchemaRefreshTime;
+        private SecondBoundConfiguration unsupportedTableSchemaRefreshTime = DEFAULT_UNSUPPORTED_TABLE_SCHEMA_REFRESH_TIME;
 
         private Builder()
         {
