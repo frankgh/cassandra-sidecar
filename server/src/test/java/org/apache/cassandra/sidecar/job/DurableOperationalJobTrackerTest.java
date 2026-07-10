@@ -214,7 +214,11 @@ class DurableOperationalJobTrackerTest
     void testGetFallsBackToStorage()
     {
         UUID jobId = UUIDs.timeBased();
-        OperationalJobRecord record = new OperationalJobRecord(jobId, OperationType.DECOMMISSION, SUCCEEDED);
+        OperationalJobRecord record = OperationalJobRecord.builder()
+                                                          .jobId(jobId)
+                                                          .operationType(OperationType.DECOMMISSION)
+                                                          .status(SUCCEEDED)
+                                                          .build();
         when(storageProvider.findJob(jobId)).thenReturn(record);
         when(storageProvider.getNodeStatusesForOperation(jobId)).thenReturn(Collections.emptyMap());
 
@@ -349,7 +353,11 @@ class DurableOperationalJobTrackerTest
         UUID succeededNode = UUIDs.timeBased();
         UUID failedNode = UUIDs.timeBased();
 
-        OperationalJobRecord record = new OperationalJobRecord(jobId, OperationType.DECOMMISSION, RUNNING);
+        OperationalJobRecord record = OperationalJobRecord.builder()
+                                                          .jobId(jobId)
+                                                          .operationType(OperationType.DECOMMISSION)
+                                                          .status(RUNNING)
+                                                          .build();
         when(storageProvider.findJob(jobId)).thenReturn(record);
 
         Map<UUID, OperationalJobStatus> nodeStatuses = new HashMap<>();
@@ -375,12 +383,12 @@ class DurableOperationalJobTrackerTest
         UUID jobId = UUIDs.timeBased();
         UUID succeededNode = UUIDs.timeBased();
 
-        OperationalJobRecord record = new OperationalJobRecord(jobId, OperationType.DECOMMISSION, SUCCEEDED,
-                                                                null, null, null, null, null,
-                                                                Collections.emptyList(),
-                                                                Collections.emptyList(),
-                                                                Collections.singletonList(succeededNode),
-                                                                Collections.emptyList());
+        OperationalJobRecord record = OperationalJobRecord.builder()
+                                                          .jobId(jobId)
+                                                          .operationType(OperationType.DECOMMISSION)
+                                                          .status(SUCCEEDED)
+                                                          .nodesSucceeded(Collections.singletonList(succeededNode))
+                                                          .build();
         when(storageProvider.findJob(jobId)).thenReturn(record);
 
         OperationalJobInfo result = tracker.get(jobId);
@@ -394,7 +402,11 @@ class DurableOperationalJobTrackerTest
     void testGetReturnsUnenrichedRecordWhenNoNodeStatuses()
     {
         UUID jobId = UUIDs.timeBased();
-        OperationalJobRecord record = new OperationalJobRecord(jobId, OperationType.DECOMMISSION, SUCCEEDED);
+        OperationalJobRecord record = OperationalJobRecord.builder()
+                                                          .jobId(jobId)
+                                                          .operationType(OperationType.DECOMMISSION)
+                                                          .status(SUCCEEDED)
+                                                          .build();
         when(storageProvider.findJob(jobId)).thenReturn(record);
         when(storageProvider.getNodeStatusesForOperation(jobId)).thenReturn(Collections.emptyMap());
 
@@ -412,7 +424,11 @@ class DurableOperationalJobTrackerTest
     void testGetPropagatesNodeStatusQueryFailure()
     {
         UUID jobId = UUIDs.timeBased();
-        OperationalJobRecord record = new OperationalJobRecord(jobId, OperationType.DECOMMISSION, SUCCEEDED);
+        OperationalJobRecord record = OperationalJobRecord.builder()
+                                                          .jobId(jobId)
+                                                          .operationType(OperationType.DECOMMISSION)
+                                                          .status(SUCCEEDED)
+                                                          .build();
         when(storageProvider.findJob(jobId)).thenReturn(record);
         when(storageProvider.getNodeStatusesForOperation(jobId))
             .thenThrow(new StorageProviderException("Node state unavailable"));
